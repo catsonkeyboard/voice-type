@@ -2,7 +2,7 @@ import SwiftUI
 
 @main
 struct VoiceTypeApp: App {
-    @State private var deps = AppDependencies()
+    @State private var deps = AppDependencies.shared
 
     private var menuBarIcon: String {
         switch deps.state.phase {
@@ -18,7 +18,6 @@ struct VoiceTypeApp: App {
         MenuBarExtra {
             PanelView()
                 .environment(deps)
-                .modelContainer(deps.container)
         } label: {
             Image(systemName: menuBarIcon)
         }
