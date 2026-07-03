@@ -29,7 +29,7 @@ v1 输出的是"逐字转写"：口头禅、说错重说、口语碎片会原样
 | 内嵌 llama.cpp / MLX | ❌ 自行管理模型分发与内存，工程量大，Ollama 已就位无必要 |
 | macOS FoundationModels（苹果端侧模型） | ❌ 约 3B 模型中文重写质量不可控，模型不可替换 |
 
-**模型**：通用 instruct 小模型，首选 `qwen3.5:8b`；Ollama 仓库无此规格时退 `qwen3:8b`（均约 5GB，一次性 `ollama pull`）。现有的 `qwen3.5:35b-a3b-coding` 是代码微调版，不作默认（用户可在设置中自行选它）。
+**模型**：本机 Ollama ≥0.19 在 M5 级 Apple Silicon 上启用了 **MLX 后端**（[官方公告](https://ollama.com/blog/mlx)），已装的 `qwen3.5:35b-a3b-coding-nvfp4` 正是首个 MLX 优化模型（MoE 激活 3B，M5 实测解码 112 tok/s，百字润色 1 秒内）。策略：**实施时先用金标用例实测该模型**——四个金标场景全过则直接作为默认（零下载、最快路径）；中文润色质量不达标再 `ollama pull` 通用 instruct 模型（`qwen3.5:8b`，无此规格退 `qwen3:8b`，约 5GB）作为默认。
 
 **延迟控制**：请求带 `keep_alive: "30m"` 让模型驻留；App 启动时发一次空预热请求。目标单次润色 1~2 秒。
 
