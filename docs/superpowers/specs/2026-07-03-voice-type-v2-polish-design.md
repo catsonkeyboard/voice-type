@@ -29,7 +29,9 @@ v1 输出的是"逐字转写"：口头禅、说错重说、口语碎片会原样
 | 内嵌 llama.cpp / MLX | ❌ 自行管理模型分发与内存，工程量大，Ollama 已就位无必要 |
 | macOS FoundationModels（苹果端侧模型） | ❌ 约 3B 模型中文重写质量不可控，模型不可替换 |
 
-**模型**：本机 Ollama ≥0.19 在 M5 级 Apple Silicon 上启用了 **MLX 后端**（[官方公告](https://ollama.com/blog/mlx)），已装的 `qwen3.5:35b-a3b-coding-nvfp4` 正是首个 MLX 优化模型（MoE 激活 3B，M5 实测解码 112 tok/s，百字润色 1 秒内）。策略：**实施时先用金标用例实测该模型**——四个金标场景全过则直接作为默认（零下载、最快路径）；中文润色质量不达标再 `ollama pull` 通用 instruct 模型（`qwen3.5:8b`，无此规格退 `qwen3:8b`，约 5GB）作为默认。
+**模型**：默认 **`qwen3.5:4b-nvfp4`**（4.0GB，用户确认的选择）。选型依据：本机 Ollama 0.30 在 M5 级 Apple Silicon 上启用了 **MLX 推理后端**（[官方公告](https://ollama.com/blog/mlx)），`nvfp4` 后缀即 MLX 引擎的 4-bit 浮点量化格式（已在本机用 `--mlx-engine` 运行时参数实证），同体积下保真度优于标准 int4；4B 通用 instruct 满足润色类改写任务，且符合用户 ≤5GB 的内存预算。
+
+**模型由用户自行下载**（`ollama pull qwen3.5:4b-nvfp4`），App 与脚本不自动拉取：设置页检测到模型缺失时展示可复制的 pull 命令；集成测试在模型缺失时自动跳过。质量闸门：模型就位后跑金标集成用例（口头禅/自我纠正/碎片连贯化/列表化），不达标的升级路径为 `4b-mxfp8`（5.6GB）或 `9b-nvfp4`（8.9GB），在设置页改模型名即可。
 
 **延迟控制**：请求带 `keep_alive: "30m"` 让模型驻留；App 启动时发一次空预热请求。目标单次润色 1~2 秒。
 
@@ -55,7 +57,7 @@ final class PolishService: @unchecked Sendable {
         var enabled: Bool    // 默认 true
         var baseURL: String  // 默认 "http://localhost:11434/v1"
         var apiKey: String   // 默认空（Ollama 不需要；云端时填）
-        var model: String    // 默认 "qwen3.5:8b"（安装脚本实际拉到哪个就默认哪个）
+        var model: String    // 默认 "qwen3.5:4b-nvfp4"
         var style: Style     // .clean（智能清理，默认）| .formal（完全书面化）
     }
 
@@ -140,7 +142,7 @@ var rawText: String?   // 润色前的原始转写；未润色的记录为 nil
 2. 听写管线接入 + `.polishing` 状态 + HUD/图标
 3. 设置「润色」Tab（开关/风格/端点/模型/测试连接）
 4. 历史保留原始转写 + 右键复制
-5. 模型安装脚本（`scripts/setup_polish.sh`：pull 模型 + 预热验证）
+5. 模型下载指引（README + 设置页 pull 命令展示；**不做自动下载**，用户自行 `ollama pull`）
 
 ### 明确不做（YAGNI）
 
