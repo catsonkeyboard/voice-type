@@ -130,7 +130,7 @@ final class PolishService: @unchecked Sendable {
             ],
             temperature: 0.2,
             stream: false,
-            keepAlive: "30m",
+            keepAlive: "10m",
             reasoningEffort: "none")
         request.httpBody = try? JSONEncoder().encode(body)
         return request

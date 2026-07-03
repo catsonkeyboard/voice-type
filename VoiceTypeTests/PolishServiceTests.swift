@@ -104,7 +104,7 @@ final class PolishServiceTests: XCTestCase {
         XCTAssertEqual(body["model"] as? String, "test-model")
         XCTAssertEqual(body["temperature"] as? Double, 0.2)
         XCTAssertEqual(body["stream"] as? Bool, false)
-        XCTAssertEqual(body["keep_alive"] as? String, "30m")
+        XCTAssertEqual(body["keep_alive"] as? String, "10m")
         XCTAssertEqual(body["reasoning_effort"] as? String, "none")
         let messages = body["messages"] as! [[String: String]]
         XCTAssertEqual(messages.count, 2)
