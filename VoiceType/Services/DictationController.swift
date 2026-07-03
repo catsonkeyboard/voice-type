@@ -9,15 +9,17 @@ final class DictationController {
 
     let state: AppState
     let asr: AsrService
+    let polish: PolishService
     private let history: HistoryStore
     private let recorder = AudioRecorder()
     private var capTimer: Timer?
     private var promptedAccessibility = false
 
-    init(state: AppState, asr: AsrService, history: HistoryStore) {
+    init(state: AppState, asr: AsrService, history: HistoryStore, polish: PolishService) {
         self.state = state
         self.asr = asr
         self.history = history
+        self.polish = polish
     }
 
     /// 快捷键与面板按钮共用的入口：idle→开始，recording→结束
@@ -27,8 +29,8 @@ final class DictationController {
             startRecording()
         case .recording:
             Task { await finishRecording() }
-        case .transcribing:
-            break  // 识别中忽略触发
+        case .transcribing, .polishing:
+            break  // 识别/润色中忽略触发
         }
     }
 
@@ -84,12 +86,28 @@ final class DictationController {
                 HUDController.shared.hide()
                 return
             }
-            history.add(text: text, durationSeconds: duration, source: "dictation")
+            var rawText: String? = nil
+            var polishDegraded = false
+            if SettingsStore.polishEnabled, text.count >= 5 {
+                state.phase = .polishing
+                if let polished = await polish.polish(text) {
+                    if polished != text { rawText = text }
+                    text = polished
+                } else {
+                    polishDegraded = true
+                }
+            }
+            history.add(
+                text: text, durationSeconds: duration, source: "dictation", rawText: rawText)
             let result = TextInjector.inject(text)
             state.phase = .idle
             switch result {
             case .injected:
-                HUDController.shared.hide()
+                if polishDegraded {
+                    HUDController.shared.flash("润色不可用，已输出原文", state: state)
+                } else {
+                    HUDController.shared.hide()
+                }
             case .copiedToClipboard:
                 HUDController.shared.flash("已复制到剪贴板，请按 ⌘V 粘贴", state: state)
                 // 首次降级时引导授权辅助功能，授权后即可直接注入

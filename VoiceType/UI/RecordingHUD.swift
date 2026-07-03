@@ -75,6 +75,11 @@ struct RecordingHUDView: View {
                         .controlSize(.small)
                     Text("识别中…")
                         .foregroundStyle(.secondary)
+                case .polishing:
+                    Image(systemName: "sparkles")
+                        .foregroundStyle(.purple)
+                    Text("润色中…")
+                        .foregroundStyle(.secondary)
                 default:
                     EmptyView()
                 }
