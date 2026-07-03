@@ -7,12 +7,17 @@ final class TranscriptRecord {
     var createdAt: Date
     var durationSeconds: Double
     var source: String  // "dictation" | "file"
+    var rawText: String?  // 润色前原始转写；未润色为 nil
 
-    init(text: String, createdAt: Date = .now, durationSeconds: Double = 0, source: String = "dictation") {
+    init(
+        text: String, createdAt: Date = .now, durationSeconds: Double = 0,
+        source: String = "dictation", rawText: String? = nil
+    ) {
         self.text = text
         self.createdAt = createdAt
         self.durationSeconds = durationSeconds
         self.source = source
+        self.rawText = rawText
     }
 }
 
@@ -28,9 +33,10 @@ final class HistoryStore {
         self.maxRecords = maxRecords
     }
 
-    func add(text: String, durationSeconds: Double, source: String) {
+    func add(text: String, durationSeconds: Double, source: String, rawText: String? = nil) {
         context.insert(
-            TranscriptRecord(text: text, durationSeconds: durationSeconds, source: source))
+            TranscriptRecord(
+                text: text, durationSeconds: durationSeconds, source: source, rawText: rawText))
         try? context.save()
         trim()
         try? context.save()

@@ -254,6 +254,12 @@ private struct HistoryRow: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .contextMenu {
+            if let rawText = record.rawText {
+                Button("复制原始转写") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(rawText, forType: .string)
+                }
+            }
             Button("删除", role: .destructive, action: onDelete)
         }
     }
