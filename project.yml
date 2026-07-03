@@ -1,0 +1,39 @@
+name: VoiceType
+options:
+  bundleIdPrefix: com.catsonkeyboard
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    ARCHS: arm64
+    CODE_SIGN_IDENTITY: "-"
+    SWIFT_OBJC_BRIDGING_HEADER: VoiceType/Support/SherpaOnnx-Bridging-Header.h
+    HEADER_SEARCH_PATHS: "$(SRCROOT)/Vendor/sherpa-onnx/include"
+    LIBRARY_SEARCH_PATHS: "$(SRCROOT)/Vendor/sherpa-onnx/lib"
+    LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
+targets:
+  VoiceType:
+    type: application
+    platform: macOS
+    sources:
+      - VoiceType
+    dependencies:
+      - framework: Vendor/sherpa-onnx/lib/libsherpa-onnx-c-api.dylib
+        embed: true
+        codeSign: true
+      - framework: Vendor/sherpa-onnx/lib/libonnxruntime.1.24.4.dylib
+        embed: true
+        codeSign: true
+    info:
+      path: VoiceType/Info.plist
+      properties:
+        CFBundleDisplayName: VoiceType
+        LSUIElement: true
+        NSMicrophoneUsageDescription: VoiceType 需要访问麦克风进行语音转写。
+schemes:
+  VoiceType:
+    build:
+      targets:
+        VoiceType: all
