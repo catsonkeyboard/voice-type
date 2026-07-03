@@ -2,12 +2,30 @@ import SwiftUI
 
 @main
 struct VoiceTypeApp: App {
+    @State private var deps = AppDependencies()
+
+    private var menuBarIcon: String {
+        switch deps.state.phase {
+        case .idle: return "mic"
+        case .recording: return "mic.fill"
+        case .transcribing: return "waveform"
+        case .error: return "mic.slash"
+        }
+    }
+
     var body: some Scene {
-        MenuBarExtra("VoiceType", systemImage: "mic") {
-            Text("VoiceType 开发中").padding()
-            Divider()
-            Button("退出") { NSApplication.shared.terminate(nil) }
-                .padding(.bottom, 8)
+        MenuBarExtra {
+            PanelView()
+                .environment(deps)
+                .modelContainer(deps.container)
+        } label: {
+            Image(systemName: menuBarIcon)
+        }
+        .menuBarExtraStyle(.window)
+
+        Settings {
+            SettingsView()
+                .environment(deps)
         }
     }
 }
