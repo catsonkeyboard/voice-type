@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 struct PanelView: View {
     @Environment(AppDependencies.self) private var deps
+    @Environment(\.openSettings) private var openSettings
     @Query(sort: \TranscriptRecord.createdAt, order: .reverse)
     private var records: [TranscriptRecord]
 
@@ -199,7 +200,11 @@ struct PanelView: View {
 
     private var footer: some View {
         HStack {
-            SettingsLink {
+            Button {
+                // LSUIElement 应用需先激活自身，否则设置窗口不前置
+                NSApp.activate(ignoringOtherApps: true)
+                openSettings()
+            } label: {
                 Label("设置", systemImage: "gearshape")
             }
             Spacer()

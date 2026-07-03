@@ -12,6 +12,7 @@ final class DictationController {
     private let history: HistoryStore
     private let recorder = AudioRecorder()
     private var capTimer: Timer?
+    private var promptedAccessibility = false
 
     init(state: AppState, asr: AsrService, history: HistoryStore) {
         self.state = state
@@ -91,6 +92,11 @@ final class DictationController {
                 HUDController.shared.hide()
             case .copiedToClipboard:
                 HUDController.shared.flash("已复制到剪贴板，请按 ⌘V 粘贴", state: state)
+                // 首次降级时引导授权辅助功能，授权后即可直接注入
+                if !TextInjector.isTrusted, !promptedAccessibility {
+                    promptedAccessibility = true
+                    TextInjector.promptForAccessibility()
+                }
             }
         } catch {
             state.phase = .error(error.localizedDescription)
