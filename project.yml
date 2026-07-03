@@ -32,8 +32,22 @@ targets:
         CFBundleDisplayName: VoiceType
         LSUIElement: true
         NSMicrophoneUsageDescription: VoiceType 需要访问麦克风进行语音转写。
+  VoiceTypeTests:
+    type: bundle.unit-test
+    platform: macOS
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: true
+    sources:
+      - VoiceTypeTests
+    dependencies:
+      - target: VoiceType
 schemes:
   VoiceType:
     build:
       targets:
         VoiceType: all
+        VoiceTypeTests: [test]
+    test:
+      targets:
+        - VoiceTypeTests
