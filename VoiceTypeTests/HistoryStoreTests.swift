@@ -33,6 +33,15 @@ final class HistoryStoreTests: XCTestCase {
         XCTAssertEqual(store.recent(limit: 100).first?.text, "记录8")
     }
 
+    func testRawTextStored() throws {
+        let store = try makeStore()
+        store.add(text: "润色后", durationSeconds: 1, source: "dictation", rawText: "嗯润色前")
+        store.add(text: "无润色", durationSeconds: 1, source: "dictation")
+        let records = store.recent(limit: 10)
+        XCTAssertEqual(records[0].rawText, nil)
+        XCTAssertEqual(records[1].rawText, "嗯润色前")
+    }
+
     func testDelete() throws {
         let store = try makeStore()
         store.add(text: "要删除", durationSeconds: 1, source: "file")
