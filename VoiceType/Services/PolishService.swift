@@ -84,10 +84,14 @@ final class PolishService: @unchecked Sendable {
         let temperature: Double
         let stream: Bool
         let keepAlive: String
+        /// 关闭 qwen 等混合推理模型的 thinking（Ollama /v1 端点原生 think 参数无效，
+        /// 必须用 reasoning_effort=none，否则先生成大段推理导致超时）
+        let reasoningEffort: String
 
         enum CodingKeys: String, CodingKey {
             case model, messages, temperature, stream
             case keepAlive = "keep_alive"
+            case reasoningEffort = "reasoning_effort"
         }
     }
 
@@ -126,7 +130,8 @@ final class PolishService: @unchecked Sendable {
             ],
             temperature: 0.2,
             stream: false,
-            keepAlive: "30m")
+            keepAlive: "30m",
+            reasoningEffort: "none")
         request.httpBody = try? JSONEncoder().encode(body)
         return request
     }
