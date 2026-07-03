@@ -5,8 +5,9 @@ import UniformTypeIdentifiers
 struct PanelView: View {
     @Environment(AppDependencies.self) private var deps
     @Environment(\.openSettings) private var openSettings
-    @Query(sort: \TranscriptRecord.createdAt, order: .reverse)
-    private var records: [TranscriptRecord]
+    // 不用 @Query：MenuBarExtra 面板中其变更观察不可靠，
+    // 改为面板出现/状态变化时直接从 HistoryStore 读取（与写入同一上下文）
+    @State private var records: [TranscriptRecord] = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -21,6 +22,13 @@ struct PanelView: View {
             footer
         }
         .frame(width: 320)
+        .onAppear { refreshHistory() }
+        .onChange(of: deps.state.phase) { _, _ in refreshHistory() }
+        .onChange(of: deps.state.fileJob) { _, _ in refreshHistory() }
+    }
+
+    private func refreshHistory() {
+        records = deps.history.recent(limit: 20)
     }
 
     // MARK: - 状态
@@ -169,10 +177,13 @@ struct PanelView: View {
                     .foregroundStyle(.secondary)
                 Spacer()
                 if !records.isEmpty {
-                    Button("清空") { deps.history.clear() }
-                        .buttonStyle(.plain)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Button("清空") {
+                        deps.history.clear()
+                        refreshHistory()
+                    }
+                    .buttonStyle(.plain)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
             }
             .padding(.horizontal, 12)
@@ -187,9 +198,10 @@ struct PanelView: View {
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(records.prefix(20)) { record in
+                        ForEach(records) { record in
                             HistoryRow(record: record) {
                                 deps.history.delete(record)
+                                refreshHistory()
                             }
                         }
                     }

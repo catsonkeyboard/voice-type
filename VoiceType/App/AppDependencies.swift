@@ -6,6 +6,10 @@ import SwiftData
 @MainActor
 @Observable
 final class AppDependencies {
+    /// 单例：App 场景重建会重复执行 @State 初始值表达式，
+    /// 必须保证容器与快捷键只初始化一次
+    static let shared = AppDependencies()
+
     let state: AppState
     let container: ModelContainer
     let history: HistoryStore
@@ -13,7 +17,7 @@ final class AppDependencies {
     let asr: AsrService
     let polish: PolishService
 
-    init() {
+    private init() {
         state = AppState()
         container = try! ModelContainer(for: TranscriptRecord.self)
         history = HistoryStore(container: container)
