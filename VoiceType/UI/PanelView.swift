@@ -44,6 +44,7 @@ struct PanelView: View {
         case .idle: return .green
         case .recording: return .red
         case .transcribing: return .blue
+        case .polishing: return .purple
         case .error: return .orange
         }
     }
@@ -56,6 +57,7 @@ struct PanelView: View {
         case .idle: return "就绪 · 按 \(SettingsStore.keyCombo.display) 开始听写"
         case .recording: return "录音中…再按快捷键结束"
         case .transcribing: return "识别中…"
+        case .polishing: return "润色中…"
         case .error(let message): return message
         }
     }
@@ -75,7 +77,9 @@ struct PanelView: View {
         .controlSize(.large)
         .buttonStyle(.borderedProminent)
         .tint(deps.state.phase == .recording ? .red : .accentColor)
-        .disabled(deps.state.phase == .transcribing || !deps.state.modelsReady)
+        .disabled(
+            deps.state.phase == .transcribing || deps.state.phase == .polishing
+                || !deps.state.modelsReady)
         .padding(12)
     }
 

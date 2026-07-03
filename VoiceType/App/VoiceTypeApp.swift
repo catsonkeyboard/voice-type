@@ -9,6 +9,7 @@ struct VoiceTypeApp: App {
         case .idle: return "mic"
         case .recording: return "mic.fill"
         case .transcribing: return "waveform"
+        case .polishing: return "sparkles"
         case .error: return "mic.slash"
         }
     }

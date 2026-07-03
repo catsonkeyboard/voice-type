@@ -11,16 +11,21 @@ final class AppDependencies {
     let history: HistoryStore
     let dictation: DictationController
     let asr: AsrService
+    let polish: PolishService
 
     init() {
         state = AppState()
         container = try! ModelContainer(for: TranscriptRecord.self)
         history = HistoryStore(container: container)
         asr = AsrService()
-        dictation = DictationController(state: state, asr: asr, history: history)
+        polish = PolishService()
+        dictation = DictationController(state: state, asr: asr, history: history, polish: polish)
 
         HotkeyManager.shared.onHotkey = { [dictation] in dictation.toggle() }
         HotkeyManager.shared.register(SettingsStore.keyCombo)
         asr.warmUp()
+        if SettingsStore.polishEnabled {
+            polish.warmUp()
+        }
     }
 }

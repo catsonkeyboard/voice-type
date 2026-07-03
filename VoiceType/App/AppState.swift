@@ -8,6 +8,7 @@ final class AppState {
         case idle
         case recording
         case transcribing
+        case polishing
         case error(String)
     }
 
