@@ -1,43 +1,54 @@
 # VoiceType
 
-macOS 菜单栏语音转写工具。全局快捷键（默认 ⌥Space）随时听写，识别结果直接输入到光标位置。基于 [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) + 阿里 FunASR [SenseVoiceSmall](https://modelscope.cn/models/iic/SenseVoiceSmall)（ONNX int8，本地推理，无网络依赖）。
+**English** | [简体中文](README.zh-CN.md)
 
-## 功能
+**VoiceType** is a macOS menu bar dictation tool that turns messy speech into clean, publish-ready text — entirely on-device.
 
-- **智能润色（v2）**：本地 LLM（Ollama + MLX）把口语碎片转为书面语——过滤"呃/嗯/那个"等口头禅、识别自我纠正（"明天下午…不对，上午九点" → "明天上午九点"）、自动把列举内容排成列表；润色不可用时自动降级输出原始转写
-- 全局快捷键听写到光标（toggle：按一下开始，再按结束），SenseVoice 自带标点与数字归一化
-- 状态栏面板：手动录音、转写历史（复制/删除）、音频文件拖拽转写（VAD 自动分段）
-- 热词词表：拼音模糊匹配纠正专有名词
-- 开机自启、快捷键自定义、录音悬浮 HUD
+Press a global hotkey (default `⌥Space`) anywhere, speak naturally, and the transcribed text is typed straight into your cursor position. A local LLM then polishes the raw transcript in real time: filler words are removed, self-corrections are resolved ("meeting tomorrow afternoon… no wait, 9 AM" → "meeting tomorrow at 9 AM"), and spoken lists are auto-formatted into numbered bullets.
 
-## 构建
+## Features
 
-前置：Xcode 15+、`brew install xcodegen`、`uv`
+- **Smart polishing (v2)**: a local LLM (Ollama + Apple MLX backend) rewrites spoken fragments into fluent written text — removes filler words ("um", "uh", 呃/嗯/那个), applies self-corrections, and auto-formats enumerations into Markdown lists. Falls back to the raw transcript automatically whenever the LLM is unavailable — dictation is never blocked
+- **Hotkey dictation to cursor**: press once to start, again to stop; recognized text is injected at the cursor of whatever app you're in. SenseVoice provides built-in punctuation and inverse text normalization
+- **Menu bar panel**: manual recording, transcription history (copy / delete, polished + raw text kept), drag-and-drop audio file transcription with VAD segmentation
+- **Hotword correction**: maintain a custom vocabulary; recognized text is corrected by pinyin fuzzy matching (great for names and domain terms)
+- Launch at login, customizable hotkey, recording HUD
 
-    ./scripts/export_model.sh   # 一次性：导出 SenseVoice ONNX int8 + 下载 VAD（模型装到 ~/Library/Application Support/VoiceType/models/）
-    ./scripts/build.sh          # 产出 dist/VoiceType.app
+## Performance
+
+On Apple Silicon: ~0.3s speech recognition (SenseVoiceSmall int8 via sherpa-onnx) + ~0.4s polishing (qwen3.5:4b-nvfp4 on Ollama's MLX backend). No network calls — audio and text never leave your Mac.
+
+## Build
+
+Prerequisites: Xcode 15+, `brew install xcodegen`
+
+    ./scripts/export_model.sh   # one-time: export SenseVoice ONNX int8 + download the VAD model
+                                # (models install to ~/Library/Application Support/VoiceType/models/)
+    ./scripts/build.sh          # produces dist/VoiceType.app
     cp -R dist/VoiceType.app /Applications/
 
-模型导出借用 voice-flow 项目的 Python venv（复用本地 modelscope 缓存的权重，零下载）。若本地无缓存，脚本会自动从 modelscope 下载。
+The export script converts a locally cached FunASR SenseVoiceSmall checkpoint (ModelScope cache) using a Python venv with `funasr`/`torch` — adjust the `VENV` path at the top of the script to your environment. Alternatively, download the prebuilt model from sherpa-onnx releases (`sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17`, ~230MB) and place `model.int8.onnx` + `tokens.txt` in the models directory.
 
-## 智能润色（v2）
+## Smart polishing (v2)
 
-润色依赖本地 Ollama（≥0.19，MLX 后端）与模型（用户自行下载）：
+Polishing requires a local [Ollama](https://ollama.com) (≥0.19 for the MLX backend) and a model (downloaded by you, never automatically):
 
-    ollama pull qwen3.5:4b-nvfp4   # 4GB，MLX/NVFP4 量化
+    ollama pull qwen3.5:4b-nvfp4   # 4GB, MLX/NVFP4 quantization
 
-默认配置即用（`http://localhost:11434/v1`）。设置 → 润色 可关闭功能、切换"智能清理/完全书面化"风格、更换模型或指向任何 OpenAI 兼容服务（如 LM Studio、云端 API）。历史记录保留润色前原文（右键 → 复制原始转写）。
+It works out of the box against `http://localhost:11434/v1`. In Settings → Polish you can toggle the feature, switch between "smart cleanup" and "formal rewrite" styles, pick another model, or point to any OpenAI-compatible endpoint (LM Studio, cloud APIs). History keeps the pre-polish transcript (right-click → copy raw text).
 
-## 首次运行授权
+## First-run permissions
 
-1. **麦克风**：首次录音时系统弹窗，允许即可
-2. **辅助功能**：注入文本到光标需要。设置 → 权限 → 去授权，在系统设置中勾选 VoiceType
+1. **Microphone** — system prompt appears on first recording
+2. **Accessibility** — required to inject text at the cursor. Settings → Permissions → Authorize, then enable VoiceType in System Settings
 
-未授权辅助功能时自动降级：结果复制到剪贴板，手动 ⌘V 粘贴。
+Without Accessibility permission VoiceType degrades gracefully: the result is copied to the clipboard and a HUD reminds you to paste with ⌘V.
 
-## 开发
+## Development
 
-    xcodegen                       # 生成 VoiceType.xcodeproj
-    open VoiceType.xcodeproj       # Xcode 开发
+    xcodegen                       # generate VoiceType.xcodeproj
+    open VoiceType.xcodeproj       # develop in Xcode
     xcodebuild -project VoiceType.xcodeproj -scheme VoiceType \
-      -destination 'platform=macOS' test   # 跑测试
+      -destination 'platform=macOS' test   # run tests
+
+Built with SwiftUI + SwiftData (macOS 14+), [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) for on-device ASR, and the OpenAI-compatible chat protocol for pluggable LLM polishing. Design docs and implementation plans live in `docs/superpowers/`.
