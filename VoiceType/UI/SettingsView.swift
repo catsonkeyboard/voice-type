@@ -7,6 +7,8 @@ struct SettingsView: View {
         TabView {
             GeneralSettingsView()
                 .tabItem { Label("通用", systemImage: "gearshape") }
+            RecognitionSettingsView()
+                .tabItem { Label("识别", systemImage: "waveform") }
             PolishSettingsView()
                 .tabItem { Label("润色", systemImage: "sparkles") }
             HotwordSettingsView()
@@ -107,6 +109,77 @@ private struct GeneralSettingsView: View {
     }
 }
 
+private struct RecognitionSettingsView: View {
+    @State private var engine = SettingsStore.asrEngine
+    @State private var apiKey = SettingsStore.dashScopeAPIKey
+    @State private var model = SettingsStore.dashScopeModel
+    @State private var testing = false
+    @State private var testOK = false
+    @State private var testResult: String?
+
+    var body: some View {
+        Form {
+            Section("识别引擎") {
+                Picker("引擎", selection: $engine) {
+                    ForEach(AsrEngine.allCases, id: \.self) { e in
+                        Text(e.label).tag(e)
+                    }
+                }
+                .pickerStyle(.radioGroup)
+                .onChange(of: engine) { _, newValue in
+                    SettingsStore.asrEngine = newValue
+                }
+                if engine == .dashscope {
+                    Text("云端模式下，录音音频将实时发送至阿里云百炼进行识别；失败时自动回退本地引擎。")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            }
+
+            if engine == .dashscope {
+                Section("阿里百炼 (DashScope)") {
+                    SecureField("API Key（存储于钥匙串）", text: $apiKey)
+                        .onChange(of: apiKey) { _, v in SettingsStore.dashScopeAPIKey = v }
+                    TextField("模型", text: $model)
+                        .onChange(of: model) { _, v in SettingsStore.dashScopeModel = v }
+                    Button(testing ? "测试中…" : "测试连接") { runTest() }
+                        .disabled(testing || apiKey.isEmpty)
+                    if let testResult {
+                        Label(
+                            testResult,
+                            systemImage: testOK ? "checkmark.circle.fill" : "xmark.circle.fill"
+                        )
+                        .foregroundStyle(testOK ? .green : .red)
+                        .font(.caption)
+                    }
+                }
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    /// 用 0.5 秒静音走完整协议验证 Key 与连通性
+    private func runTest() {
+        testing = true
+        testResult = nil
+        Task {
+            let session = DashScopeAsrSession(apiKey: apiKey, model: model)
+            do {
+                try await session.start()
+                session.send(samples: [Float](repeating: 0, count: 8000))
+                _ = try await session.finish()
+                testOK = true
+                testResult = "连接成功，Key 有效"
+            } catch {
+                session.cancel()
+                testOK = false
+                testResult = "失败：\(error.localizedDescription)"
+            }
+            testing = false
+        }
+    }
+}
+
 private struct PolishSettingsView: View {
     @Environment(AppDependencies.self) private var deps
     @State private var enabled = SettingsStore.polishEnabled
@@ -136,6 +209,16 @@ private struct PolishSettingsView: View {
             }
 
             Section("服务（OpenAI 兼容，默认本地 Ollama）") {
+                Menu("服务商预设") {
+                    ForEach(PolishPreset.allCases, id: \.self) { preset in
+                        Button("\(preset.rawValue)（\(preset.recommendedModel)）") {
+                            baseURL = preset.baseURL
+                            SettingsStore.polishBaseURL = preset.baseURL
+                            model = preset.recommendedModel
+                            SettingsStore.polishModel = preset.recommendedModel
+                        }
+                    }
+                }
                 TextField("服务地址", text: $baseURL)
                     .onChange(of: baseURL) { _, v in SettingsStore.polishBaseURL = v }
                 SecureField("API Key（本地 Ollama 留空）", text: $apiKey)
