@@ -1,5 +1,17 @@
 import Foundation
 
+enum AsrEngine: String, Codable, CaseIterable {
+    case local
+    case dashscope
+
+    var label: String {
+        switch self {
+        case .local: return "本地 SenseVoice"
+        case .dashscope: return "云端 Fun-ASR-Realtime"
+        }
+    }
+}
+
 enum SettingsStore {
     private static let defaults = UserDefaults.standard
 
@@ -27,6 +39,35 @@ enum SettingsStore {
         }
     }
 
+    // MARK: - 识别引擎（v3）
+
+    static var asrEngine: AsrEngine {
+        get {
+            defaults.string(forKey: "asrEngine").flatMap(AsrEngine.init(rawValue:)) ?? .local
+        }
+        set { defaults.set(newValue.rawValue, forKey: "asrEngine") }
+    }
+
+    static var dashScopeModel: String {
+        get { defaults.string(forKey: "dashScopeModel") ?? "fun-asr-realtime" }
+        set { defaults.set(newValue, forKey: "dashScopeModel") }
+    }
+
+    static var dashScopeAPIKey: String {
+        get { KeychainStore.get("dashscope-api-key") ?? "" }
+        set { KeychainStore.set(newValue, account: "dashscope-api-key") }
+    }
+
+    /// 把历史遗留的明文 Key 迁入 Keychain（App 启动时调用一次）
+    static func migrateSecretsToKeychainIfNeeded(polishAccount: String = "polish-api-key") {
+        if let legacy = defaults.string(forKey: "polishAPIKey"), !legacy.isEmpty {
+            if KeychainStore.get(polishAccount) == nil {
+                KeychainStore.set(legacy, account: polishAccount)
+            }
+            defaults.removeObject(forKey: "polishAPIKey")
+        }
+    }
+
     // MARK: - 润色（v2）
 
     static var polishEnabled: Bool {
@@ -43,8 +84,8 @@ enum SettingsStore {
     }
 
     static var polishAPIKey: String {
-        get { defaults.string(forKey: "polishAPIKey") ?? "" }
-        set { defaults.set(newValue, forKey: "polishAPIKey") }
+        get { KeychainStore.get("polish-api-key") ?? "" }
+        set { KeychainStore.set(newValue, account: "polish-api-key") }
     }
 
     static var polishModel: String {
