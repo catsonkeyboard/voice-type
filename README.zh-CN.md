@@ -2,11 +2,12 @@
 
 [English](README.md) | **简体中文**
 
-macOS 菜单栏语音转写工具。全局快捷键（默认 ⌥Space）随时听写，识别结果直接输入到光标位置。基于 [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) + 阿里 FunASR [SenseVoiceSmall](https://modelscope.cn/models/iic/SenseVoiceSmall)（ONNX int8，本地推理，无网络依赖）。
+macOS 菜单栏语音转写工具。全局快捷键（默认 ⌥Space）随时听写，识别结果直接输入到光标位置。基于 [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) + 阿里 FunASR [SenseVoiceSmall](https://modelscope.cn/models/iic/SenseVoiceSmall)（ONNX int8）。默认本地推理；云端识别与云端润色为显式可选项。
 
 ## 功能
 
 - **智能润色（v2）**：本地 LLM（Ollama + MLX）把口语碎片转为书面语——过滤"呃/嗯/那个"等口头禅、识别自我纠正（"明天下午…不对，上午九点" → "明天上午九点"）、自动把列举内容排成列表；润色不可用时自动降级输出原始转写
+- **云端识别（v3，可选）**：可切换到阿里云百炼 Fun-ASR-Realtime 流式识别——说话时 HUD 实时显示中间结果，停止后终稿几乎立即产出；任何失败自动回退本地引擎。API Key 存 macOS 钥匙串。注意：云端模式音频会发送至阿里云
 - 全局快捷键听写到光标（toggle：按一下开始，再按结束），SenseVoice 自带标点与数字归一化
 - 状态栏面板：手动录音、转写历史（复制/删除）、音频文件拖拽转写（VAD 自动分段）
 - 热词词表：拼音模糊匹配纠正专有名词
@@ -28,7 +29,7 @@ macOS 菜单栏语音转写工具。全局快捷键（默认 ⌥Space）随时�
 
     ollama pull qwen3.5:4b-nvfp4   # 4GB，MLX/NVFP4 量化
 
-默认配置即用（`http://localhost:11434/v1`）。设置 → 润色 可关闭功能、切换"智能清理/完全书面化"风格、更换模型或指向任何 OpenAI 兼容服务（如 LM Studio、云端 API）。历史记录保留润色前原文（右键 → 复制原始转写）。
+默认配置即用（`http://localhost:11434/v1`）。设置 → 润色 可关闭功能、切换"智能清理/完全书面化"风格、更换模型或指向任何 OpenAI 兼容服务（如 LM Studio、云端 API）。历史记录保留润色前原文（右键 → 复制原始转写）。设置内置服务商预设（本地 Ollama / 阿里百炼 / DeepSeek / OpenAI），一键填充地址与推荐模型。
 
 ## 首次运行授权
 
