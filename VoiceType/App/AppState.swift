@@ -21,6 +21,8 @@ final class AppState {
 
     var phase: Phase = .idle
     var micLevel: Float = 0
+    /// 云端识别的实时中间结果（仅云端引擎录音阶段非空）
+    var partialText: String?
     /// HUD 上的一次性提示（如"已复制到剪贴板"），显示后由 HUDController 清除
     var hudMessage: String?
     var fileJob: FileJob = .idle

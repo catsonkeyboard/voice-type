@@ -24,6 +24,8 @@ final class AudioRecorder: @unchecked Sendable {
 
     /// 音频电平回调（0~1），主线程派发，供 HUD 显示
     var onLevel: ((Float) -> Void)?
+    /// 转换后的 16k chunk 实时回调（主线程派发，云端推流用）
+    var onChunk: (([Float]) -> Void)?
 
     static func requestPermission() async -> Bool {
         await AVCaptureDevice.requestAccess(for: .audio)
@@ -84,14 +86,18 @@ final class AudioRecorder: @unchecked Sendable {
 
         let chunk = UnsafeBufferPointer(
             start: outBuf.floatChannelData![0], count: Int(outBuf.frameLength))
+        let chunkArray = Array(chunk)
         lock.lock()
-        samples.append(contentsOf: chunk)
+        samples.append(contentsOf: chunkArray)
         lock.unlock()
 
         var sum: Float = 0
-        for v in chunk { sum += v * v }
-        let rms = (sum / Float(max(chunk.count, 1))).squareRoot()
+        for v in chunkArray { sum += v * v }
+        let rms = (sum / Float(max(chunkArray.count, 1))).squareRoot()
         let level = min(1, rms * 12)
-        DispatchQueue.main.async { [weak self] in self?.onLevel?(level) }
+        DispatchQueue.main.async { [weak self] in
+            self?.onLevel?(level)
+            self?.onChunk?(chunkArray)
+        }
     }
 }

@@ -14,7 +14,7 @@ final class HUDController {
         flashTask?.cancel()
         if panel == nil {
             let p = NSPanel(
-                contentRect: NSRect(x: 0, y: 0, width: 240, height: 56),
+                contentRect: NSRect(x: 0, y: 0, width: 320, height: 96),
                 styleMask: [.nonactivatingPanel, .borderless],
                 backing: .buffered, defer: false)
             p.level = .statusBar
@@ -65,11 +65,22 @@ struct RecordingHUDView: View {
             } else {
                 switch state.phase {
                 case .recording:
-                    Image(systemName: "mic.fill")
-                        .foregroundStyle(.red)
-                    LevelBarsView(level: state.micLevel)
-                    Text("录音中")
-                        .foregroundStyle(.secondary)
+                    VStack(spacing: 6) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "mic.fill")
+                                .foregroundStyle(.red)
+                            LevelBarsView(level: state.micLevel)
+                            Text("录音中")
+                                .foregroundStyle(.secondary)
+                        }
+                        if let partial = state.partialText, !partial.isEmpty {
+                            Text(partial)
+                                .font(.system(size: 12))
+                                .lineLimit(2)
+                                .truncationMode(.head)  // 保留最新内容（尾部）
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
                 case .transcribing:
                     ProgressView()
                         .controlSize(.small)
@@ -89,7 +100,7 @@ struct RecordingHUDView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
-        .frame(width: 240, height: 56)
+        .frame(width: 320)
     }
 }
 
