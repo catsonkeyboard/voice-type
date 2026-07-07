@@ -18,6 +18,7 @@ final class AppDependencies {
     let polish: PolishService
 
     private init() {
+        SettingsStore.migrateSecretsToKeychainIfNeeded()
         state = AppState()
         container = try! ModelContainer(for: TranscriptRecord.self)
         history = HistoryStore(container: container)

@@ -3,7 +3,7 @@ import XCTest
 @testable import VoiceType
 
 final class PolishSettingsTests: XCTestCase {
-    private let keys = ["polishEnabled", "polishBaseURL", "polishAPIKey", "polishModel", "polishStyle"]
+    private let keys = ["polishEnabled", "polishBaseURL", "polishModel", "polishStyle"]
 
     override func setUp() {
         super.setUp()
@@ -18,7 +18,6 @@ final class PolishSettingsTests: XCTestCase {
     func testDefaults() {
         XCTAssertTrue(SettingsStore.polishEnabled)
         XCTAssertEqual(SettingsStore.polishBaseURL, "http://localhost:11434/v1")
-        XCTAssertEqual(SettingsStore.polishAPIKey, "")
         XCTAssertEqual(SettingsStore.polishModel, "qwen3.5:4b-nvfp4")
         XCTAssertEqual(SettingsStore.polishStyle, .clean)
     }
