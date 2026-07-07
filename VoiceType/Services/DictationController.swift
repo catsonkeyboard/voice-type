@@ -14,6 +14,7 @@ final class DictationController {
     private let recorder = AudioRecorder()
     private var capTimer: Timer?
     private var promptedAccessibility = false
+    private var cloudSession: DashScopeAsrSession?
 
     init(state: AppState, asr: AsrService, history: HistoryStore, polish: PolishService) {
         self.state = state
@@ -35,11 +36,21 @@ final class DictationController {
     }
 
     private func startRecording() {
-        state.refreshModelsReady()
-        guard state.modelsReady else {
-            state.phase = .error(AsrError.modelMissing.localizedDescription)
-            HUDController.shared.flash("模型未安装，请查看设置", state: state)
-            return
+        let engine = SettingsStore.asrEngine
+        switch engine {
+        case .local:
+            state.refreshModelsReady()
+            guard state.modelsReady else {
+                state.phase = .error(AsrError.modelMissing.localizedDescription)
+                HUDController.shared.flash("模型未安装，请查看设置", state: state)
+                return
+            }
+        case .dashscope:
+            guard !SettingsStore.dashScopeAPIKey.isEmpty else {
+                state.phase = .error(DashScopeError.notConfigured.localizedDescription)
+                HUDController.shared.flash("请在设置 → 识别 中填写 DashScope API Key", state: state)
+                return
+            }
         }
         Task {
             guard await AudioRecorder.requestPermission() else {
@@ -48,8 +59,12 @@ final class DictationController {
                 return
             }
             do {
+                if engine == .dashscope { setupCloudSession() }
                 recorder.onLevel = { [weak self] level in
                     self?.state.micLevel = level
+                }
+                recorder.onChunk = { [weak self] chunk in
+                    self?.cloudSession?.send(samples: chunk)
                 }
                 try recorder.start()
                 state.phase = .recording
@@ -60,8 +75,30 @@ final class DictationController {
                     Task { @MainActor in await self?.finishRecording() }
                 }
             } catch {
+                cloudSession?.cancel()
+                cloudSession = nil
                 state.phase = .error(error.localizedDescription)
                 HUDController.shared.flash(error.localizedDescription, state: state)
+            }
+        }
+    }
+
+    /// 并行建立云端会话；建连失败仅使本次云端不可用（finish 时走本地回退）
+    private func setupCloudSession() {
+        let session = DashScopeAsrSession(
+            apiKey: SettingsStore.dashScopeAPIKey, model: SettingsStore.dashScopeModel)
+        session.onPartial = { [weak self] text in
+            Task { @MainActor in self?.state.partialText = text }
+        }
+        cloudSession = session
+        Task { [weak self, session] in
+            do {
+                try await session.start()
+            } catch {
+                await MainActor.run {
+                    // 仅当仍是当前会话时清除（避免竞态清掉下一次的会话）
+                    if self?.cloudSession === session { self?.cloudSession = nil }
+                }
             }
         }
     }
@@ -71,15 +108,34 @@ final class DictationController {
         capTimer?.invalidate()
         capTimer = nil
         let samples = recorder.stop()
+        recorder.onChunk = nil
+        let session = cloudSession
+        cloudSession = nil
+        state.partialText = nil
+
         let duration = Double(samples.count) / 16000.0
         guard duration >= Self.minRecordingSeconds else {
+            session?.cancel()
             state.phase = .idle
             HUDController.shared.hide()
             return
         }
         state.phase = .transcribing
         do {
-            var text = try await asr.transcribe(samples: samples)
+            var cloudDegraded = false
+            var text: String
+            if let session {
+                do {
+                    text = try await session.finish()
+                } catch {
+                    session.cancel()
+                    cloudDegraded = true
+                    text = try await asr.transcribe(samples: samples)
+                }
+            } else {
+                if SettingsStore.asrEngine == .dashscope { cloudDegraded = true }
+                text = try await asr.transcribe(samples: samples)
+            }
             text = HotwordCorrector(hotwords: SettingsStore.hotwords).correct(text)
             guard !text.isEmpty else {
                 state.phase = .idle
@@ -103,7 +159,9 @@ final class DictationController {
             state.phase = .idle
             switch result {
             case .injected:
-                if polishDegraded {
+                if cloudDegraded {
+                    HUDController.shared.flash("云端不可用，已用本地识别", state: state)
+                } else if polishDegraded {
                     HUDController.shared.flash("润色不可用，已输出原文", state: state)
                 } else {
                     HUDController.shared.hide()
