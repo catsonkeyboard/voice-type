@@ -83,10 +83,11 @@ final class PolishService: @unchecked Sendable {
         let messages: [Message]
         let temperature: Double
         let stream: Bool
-        let keepAlive: String
-        /// 关闭 qwen 等混合推理模型的 thinking（Ollama /v1 端点原生 think 参数无效，
+        /// Ollama 专属：模型保活时长（合成 Codable 对 Optional 用 encodeIfPresent，nil 不出现在 JSON）
+        let keepAlive: String?
+        /// Ollama 专属：关闭 qwen 等混合推理模型的 thinking（/v1 端点原生 think 参数无效，
         /// 必须用 reasoning_effort=none，否则先生成大段推理导致超时）
-        let reasoningEffort: String
+        let reasoningEffort: String?
 
         enum CodingKeys: String, CodingKey {
             case model, messages, temperature, stream
@@ -122,6 +123,9 @@ final class PolishService: @unchecked Sendable {
         if !config.apiKey.isEmpty {
             request.setValue("Bearer \(config.apiKey)", forHTTPHeaderField: "Authorization")
         }
+        // keep_alive / reasoning_effort 是 Ollama 专属参数，
+        // OpenAI 等云端 API 会以 400 拒绝未知参数——仅本机端点携带
+        let isLocalEndpoint = ["localhost", "127.0.0.1"].contains(url.host ?? "")
         let body = ChatRequest(
             model: config.model,
             messages: [
@@ -130,8 +134,8 @@ final class PolishService: @unchecked Sendable {
             ],
             temperature: 0.2,
             stream: false,
-            keepAlive: "10m",
-            reasoningEffort: "none")
+            keepAlive: isLocalEndpoint ? "10m" : nil,
+            reasoningEffort: isLocalEndpoint ? "none" : nil)
         request.httpBody = try? JSONEncoder().encode(body)
         return request
     }

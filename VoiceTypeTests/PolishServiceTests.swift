@@ -170,6 +170,32 @@ final class PolishServiceTests: XCTestCase {
         XCTAssertNil(result)
     }
 
+    func testRemoteEndpointOmitsOllamaParams() async throws {
+        let cfg = URLSessionConfiguration.ephemeral
+        cfg.protocolClasses = [MockURLProtocol.self]
+        let remote = PolishService(
+            session: URLSession(configuration: cfg),
+            configProvider: {
+                PolishConfig(
+                    enabled: true, baseURL: "https://api.deepseek.com/v1", apiKey: "sk-x",
+                    model: "deepseek-chat", style: .clean)
+            })
+        stubSuccess(content: "结果文本。")
+        _ = await remote.polish("嗯这是一段测试文本")
+        let request = try XCTUnwrap(MockURLProtocol.recordedRequests.first)
+        let body = try JSONSerialization.jsonObject(
+            with: XCTUnwrap(request.bodyData)) as! [String: Any]
+        XCTAssertNil(body["keep_alive"], "远程端点不应携带 Ollama 专属参数")
+        XCTAssertNil(body["reasoning_effort"], "远程端点不应携带 Ollama 专属参数")
+        XCTAssertEqual(body["model"] as? String, "deepseek-chat")
+    }
+
+    func testPresetFillsBaseURLAndModel() {
+        XCTAssertEqual(PolishPreset.bailian.baseURL, "https://dashscope.aliyuncs.com/compatible-mode/v1")
+        XCTAssertEqual(PolishPreset.deepseek.recommendedModel, "deepseek-chat")
+        XCTAssertEqual(PolishPreset.ollama.baseURL, "http://localhost:11434/v1")
+    }
+
     func testProbeParsesOllamaTags() async throws {
         MockURLProtocol.handler = { request in
             XCTAssertEqual(request.url?.path, "/api/tags")
