@@ -20,6 +20,32 @@ struct PolishConfig: Equatable {
     var style: PolishStyle
 }
 
+/// 润色服务商预设：仅作为设置页的一键填充器
+enum PolishPreset: String, CaseIterable {
+    case ollama = "本地 Ollama"
+    case bailian = "阿里百炼"
+    case deepseek = "DeepSeek"
+    case openai = "OpenAI"
+
+    var baseURL: String {
+        switch self {
+        case .ollama: return "http://localhost:11434/v1"
+        case .bailian: return "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        case .deepseek: return "https://api.deepseek.com/v1"
+        case .openai: return "https://api.openai.com/v1"
+        }
+    }
+
+    var recommendedModel: String {
+        switch self {
+        case .ollama: return "qwen3.5:4b-nvfp4"
+        case .bailian: return "qwen-flash"
+        case .deepseek: return "deepseek-chat"
+        case .openai: return "gpt-5-mini"
+        }
+    }
+}
+
 enum PromptTemplates {
     static func system(for style: PolishStyle) -> String {
         switch style {
