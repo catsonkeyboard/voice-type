@@ -120,6 +120,7 @@ final class DictationController {
             HUDController.shared.hide()
             return
         }
+        DebugAudioDump.write(samples: samples)
         state.phase = .transcribing
         do {
             var cloudDegraded = false
