@@ -18,6 +18,15 @@ enum ModelPaths {
     static var asrModel: URL { modelsDir.appendingPathComponent("model.int8.onnx") }
     static var tokens: URL { modelsDir.appendingPathComponent("tokens.txt") }
     static var vadModel: URL { modelsDir.appendingPathComponent("silero_vad.onnx") }
+    static var segmentationModel: URL { modelsDir.appendingPathComponent("segmentation.onnx") }
+    static var speakerEmbeddingModel: URL {
+        modelsDir.appendingPathComponent("speaker-embedding.onnx")
+    }
+    static var diarizationPresent: Bool {
+        [segmentationModel, speakerEmbeddingModel].allSatisfy {
+            FileManager.default.fileExists(atPath: $0.path)
+        }
+    }
     static var allPresent: Bool {
         [asrModel, tokens, vadModel].allSatisfy {
             FileManager.default.fileExists(atPath: $0.path)
