@@ -16,6 +16,7 @@ final class AppDependencies {
     let dictation: DictationController
     let asr: AsrService
     let polish: PolishService
+    let meeting: MeetingController
 
     private init() {
         SettingsStore.migrateSecretsToKeychainIfNeeded()
@@ -25,6 +26,7 @@ final class AppDependencies {
         asr = AsrService()
         polish = PolishService()
         dictation = DictationController(state: state, asr: asr, history: history, polish: polish)
+        meeting = MeetingController(state: state, asr: asr)
 
         HotkeyManager.shared.onHotkey = { [dictation] in dictation.toggle() }
         HotkeyManager.shared.register(SettingsStore.keyCombo)

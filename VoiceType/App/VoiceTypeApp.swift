@@ -27,5 +27,12 @@ struct VoiceTypeApp: App {
             SettingsView()
                 .environment(deps)
         }
+
+        WindowGroup("会议转写", id: "meeting", for: URL.self) { $url in
+            if let url {
+                MeetingResultView(jsonURL: url)
+                    .environment(deps)
+            }
+        }
     }
 }

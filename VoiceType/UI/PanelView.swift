@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 struct PanelView: View {
     @Environment(AppDependencies.self) private var deps
     @Environment(\.openSettings) private var openSettings
+    @Environment(\.openWindow) private var openWindow
     // 不用 @Query：MenuBarExtra 面板中其变更观察不可靠，
     // 改为面板出现/状态变化时直接从 HistoryStore 读取（与写入同一上下文）
     @State private var records: [TranscriptRecord] = []
@@ -14,6 +15,8 @@ struct PanelView: View {
             statusHeader
             Divider()
             recordButton
+            Divider()
+            meetingSection
             Divider()
             fileSection
             Divider()
@@ -91,6 +94,68 @@ struct PanelView: View {
         .padding(12)
     }
 
+    // MARK: - 会议（v4）
+
+    private var meetingSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            switch deps.state.meeting {
+            case .idle, .failed:
+                HStack {
+                    Button {
+                        deps.meeting.startRecording()
+                    } label: {
+                        Label("开始会议录音", systemImage: "person.2.wave.2")
+                    }
+                    .disabled(!ModelPaths.diarizationPresent)
+                    Spacer()
+                    if let url = deps.state.meetingResultURL {
+                        Button("查看结果") {
+                            NSApp.activate(ignoringOtherApps: true)
+                            openWindow(id: "meeting", value: url)
+                        }
+                        .controlSize(.small)
+                    }
+                }
+                if case .failed(let message) = deps.state.meeting {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+                if !ModelPaths.diarizationPresent {
+                    Text("说话人分离模型未安装：运行 scripts/setup_diarization.sh")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            case .recording(let startedAt):
+                HStack {
+                    Label("会议录音中", systemImage: "record.circle")
+                        .foregroundStyle(.red)
+                    Text(startedAt, style: .timer)
+                        .monospacedDigit()
+                    Spacer()
+                    Button("停止并转写") {
+                        deps.meeting.stopAndProcess()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.red)
+                    .controlSize(.small)
+                }
+            case .processing(let stage, let progress):
+                ProgressView(value: progress) {
+                    Text("会议处理：\(stage)")
+                        .font(.caption)
+                }
+            }
+        }
+        .padding(12)
+        .onChange(of: deps.state.meetingResultURL) { _, url in
+            if let url {
+                NSApp.activate(ignoringOtherApps: true)
+                openWindow(id: "meeting", value: url)
+            }
+        }
+    }
+
     // MARK: - 文件转写
 
     private var fileSection: some View {
@@ -138,8 +203,13 @@ struct PanelView: View {
             Text(prompt)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            Button("选择文件…") { pickFile() }
-                .controlSize(.small)
+            HStack {
+                Button("选择文件…") { pickFile() }
+                Button("会议转写…") { pickMeetingFile() }
+                    .disabled(!ModelPaths.diarizationPresent)
+                    .help("区分说话人的会议转写")
+            }
+            .controlSize(.small)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
@@ -164,6 +234,15 @@ struct PanelView: View {
         panel.allowsMultipleSelection = false
         if panel.runModal() == .OK, let url = panel.url {
             deps.dictation.transcribeFile(url: url)
+        }
+    }
+
+    private func pickMeetingFile() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.audio]
+        panel.allowsMultipleSelection = false
+        if panel.runModal() == .OK, let url = panel.url {
+            deps.meeting.process(url: url)
         }
     }
 
