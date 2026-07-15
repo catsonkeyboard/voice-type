@@ -136,6 +136,30 @@ private struct RecognitionSettingsView: View {
                 }
             }
 
+            Section("说话人分离（会议转写）") {
+                LabeledContent("分离模型") {
+                    if ModelPaths.diarizationPresent {
+                        Label("已安装", systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                    } else {
+                        Label("未安装", systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                    }
+                }
+                if !ModelPaths.diarizationPresent {
+                    HStack {
+                        Text("scripts/setup_diarization.sh")
+                            .font(.caption.monospaced())
+                        Button("复制命令") {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(
+                                "./scripts/setup_diarization.sh", forType: .string)
+                        }
+                        .controlSize(.small)
+                    }
+                }
+            }
+
             if engine == .dashscope {
                 Section("阿里百炼 (DashScope)") {
                     SecureField("API Key（存储于钥匙串）", text: $apiKey)

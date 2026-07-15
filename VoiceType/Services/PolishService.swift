@@ -25,7 +25,11 @@ final class PolishService: @unchecked Sendable {
         let input = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard input.count >= 5 else { return nil }
         let config = configProvider()
-        guard let request = makeChatRequest(input: input, config: config) else { return nil }
+        guard
+            let request = makeChatRequest(
+                system: PromptTemplates.system(for: config.style), user: input,
+                config: config, timeout: 15)
+        else { return nil }
         do {
             let (data, response) = try await session.data(for: request)
             guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode)
@@ -35,6 +39,26 @@ final class PolishService: @unchecked Sendable {
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             guard !cleaned.isEmpty, cleaned.count <= input.count * 3 else { return nil }
             return cleaned
+        } catch {
+            return nil
+        }
+    }
+
+    /// 通用补全（会议纪要等场景复用润色的 LLM 通道与配置；60 秒超时，无长度防跑偏校验）
+    func complete(system: String, user: String) async -> String? {
+        let config = configProvider()
+        guard
+            let request = makeChatRequest(
+                system: system, user: user, config: config, timeout: 60)
+        else { return nil }
+        do {
+            let (data, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
+                let content = Self.parseContent(data)
+            else { return nil }
+            let cleaned = Self.stripThinking(content)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return cleaned.isEmpty ? nil : cleaned
         } catch {
             return nil
         }
@@ -113,12 +137,14 @@ final class PolishService: @unchecked Sendable {
         let models: [Model]
     }
 
-    private func makeChatRequest(input: String, config: PolishConfig) -> URLRequest? {
+    private func makeChatRequest(
+        system: String, user: String, config: PolishConfig, timeout: TimeInterval
+    ) -> URLRequest? {
         let base = config.baseURL.hasSuffix("/") ? String(config.baseURL.dropLast()) : config.baseURL
         guard let url = URL(string: base + "/chat/completions") else { return nil }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.timeoutInterval = 15
+        request.timeoutInterval = timeout
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         if !config.apiKey.isEmpty {
             request.setValue("Bearer \(config.apiKey)", forHTTPHeaderField: "Authorization")
@@ -129,8 +155,8 @@ final class PolishService: @unchecked Sendable {
         let body = ChatRequest(
             model: config.model,
             messages: [
-                .init(role: "system", content: PromptTemplates.system(for: config.style)),
-                .init(role: "user", content: input),
+                .init(role: "system", content: system),
+                .init(role: "user", content: user),
             ],
             temperature: 0.2,
             stream: false,

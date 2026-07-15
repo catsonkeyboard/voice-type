@@ -25,6 +25,10 @@ final class DictationController {
 
     /// 快捷键与面板按钮共用的入口：idle→开始，recording→结束
     func toggle() {
+        if case .recording = state.meeting {
+            HUDController.shared.flash("会议录音进行中，听写不可用", state: state)
+            return
+        }
         switch state.phase {
         case .idle, .error:
             startRecording()
