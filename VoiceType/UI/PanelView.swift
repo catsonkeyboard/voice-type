@@ -49,8 +49,16 @@ struct PanelView: View {
         .padding(12)
     }
 
+    /// 按当前引擎判断听写就绪：本地看模型，云端看 Key
+    private var engineReady: Bool {
+        switch SettingsStore.asrEngine {
+        case .local: return deps.state.modelsReady
+        case .dashscope: return !SettingsStore.dashScopeAPIKey.isEmpty
+        }
+    }
+
     private var statusColor: Color {
-        if !deps.state.modelsReady { return .orange }
+        if !engineReady { return .orange }
         switch deps.state.phase {
         case .idle: return .green
         case .recording: return .red
@@ -61,8 +69,11 @@ struct PanelView: View {
     }
 
     private var statusText: String {
-        if !deps.state.modelsReady {
-            return "模型未安装：请运行 scripts/export_model.sh"
+        if !engineReady {
+            switch SettingsStore.asrEngine {
+            case .local: return "模型未安装：请运行 scripts/export_model.sh"
+            case .dashscope: return "未配置 DashScope API Key（设置 → 识别）"
+            }
         }
         switch deps.state.phase {
         case .idle: return "就绪 · 按 \(SettingsStore.keyCombo.display) 开始听写"
@@ -90,7 +101,7 @@ struct PanelView: View {
         .tint(deps.state.phase == .recording ? .red : .accentColor)
         .disabled(
             deps.state.phase == .transcribing || deps.state.phase == .polishing
-                || !deps.state.modelsReady)
+                || !engineReady)
         .padding(12)
     }
 
