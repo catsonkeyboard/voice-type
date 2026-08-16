@@ -75,17 +75,19 @@ private struct GeneralSettingsView: View {
             }
 
             Section("模型") {
-                LabeledContent("SenseVoice + VAD") {
-                    if deps.state.modelsReady {
-                        Label("已安装", systemImage: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                    } else {
-                        Label("未安装", systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
+                ForEach(LocalAsrModel.allCases) { m in
+                    LabeledContent(m.label) {
+                        if ModelPaths.isPresent(m) {
+                            Label("已安装", systemImage: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                        } else {
+                            Label("未安装", systemImage: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                        }
                     }
                 }
                 if !deps.state.modelsReady {
-                    Text("请在项目目录运行 scripts/export_model.sh 后点击刷新")
+                    Text("当前模型 \((SettingsStore.localAsrModel.label)) 未安装：\(SettingsStore.localAsrModel.installCommand)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -110,7 +112,9 @@ private struct GeneralSettingsView: View {
 }
 
 private struct RecognitionSettingsView: View {
+    @Environment(AppDependencies.self) private var deps
     @State private var engine = SettingsStore.asrEngine
+    @State private var localModel = SettingsStore.localAsrModel
     @State private var apiKey = SettingsStore.dashScopeAPIKey
     @State private var model = SettingsStore.dashScopeModel
     @State private var testing = false
@@ -129,6 +133,18 @@ private struct RecognitionSettingsView: View {
                 .onChange(of: engine) { _, newValue in
                     SettingsStore.asrEngine = newValue
                 }
+                if engine == .local {
+                    Picker("本地模型", selection: $localModel) {
+                        ForEach(LocalAsrModel.allCases) { m in
+                            Text(m.label).tag(m)
+                        }
+                    }
+                    .onChange(of: localModel) { _, newValue in
+                        SettingsStore.localAsrModel = newValue
+                        deps.asr.reload()
+                        deps.state.refreshModelsReady()
+                    }
+                }
                 if engine == .dashscope {
                     Text("云端模式下，录音音频将实时发送至阿里云百炼进行识别；失败时自动回退本地引擎。")
                         .font(.caption)
@@ -136,6 +152,36 @@ private struct RecognitionSettingsView: View {
                 }
             }
 
+            if engine == .local {
+                Section("本地识别模型") {
+                    ForEach(LocalAsrModel.allCases) { m in
+                        LabeledContent(m.label) {
+                            if ModelPaths.isPresent(m) {
+                                Label("已安装", systemImage: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                            } else {
+                                Label("未安装", systemImage: "exclamationmark.triangle.fill")
+                                    .foregroundStyle(.orange)
+                            }
+                        }
+                        Text(m.note)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    if !ModelPaths.isPresent(localModel) {
+                        HStack {
+                            Text(localModel.installCommand)
+                                .font(.caption.monospaced())
+                            Button("复制命令") {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(
+                                    localModel.installCommand, forType: .string)
+                            }
+                            .controlSize(.small)
+                        }
+                    }
+                }
+            }
             Section("说话人分离（会议转写）") {
                 LabeledContent("分离模型") {
                     if ModelPaths.diarizationPresent {

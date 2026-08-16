@@ -71,7 +71,7 @@ struct PanelView: View {
     private var statusText: String {
         if !engineReady {
             switch SettingsStore.asrEngine {
-            case .local: return "模型未安装：请运行 scripts/export_model.sh"
+            case .local: return "模型未安装：\(SettingsStore.localAsrModel.label)（设置 → 识别 可切换）"
             case .dashscope: return "未配置 DashScope API Key（设置 → 识别）"
             }
         }

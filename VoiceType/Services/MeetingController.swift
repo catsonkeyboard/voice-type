@@ -21,7 +21,9 @@ final class MeetingController {
     func startRecording() {
         state.refreshModelsReady()
         guard state.modelsReady else {
-            state.meeting = .failed("本地识别模型未安装，请运行 scripts/export_model.sh")
+            state.meeting = .failed(
+                "本地识别模型未安装（\(SettingsStore.localAsrModel.label)），请运行 "
+                    + SettingsStore.localAsrModel.installCommand)
             return
         }
         guard ModelPaths.diarizationPresent else {
