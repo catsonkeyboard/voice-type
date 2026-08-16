@@ -6,8 +6,46 @@ enum AsrEngine: String, Codable, CaseIterable {
 
     var label: String {
         switch self {
-        case .local: return "本地 SenseVoice"
+        case .local: return "本地识别"
         case .dashscope: return "云端 Fun-ASR-Realtime"
+        }
+    }
+}
+
+/// 本地识别模型档位（均为 sherpa-onnx 离线模型）
+enum LocalAsrModel: String, Codable, CaseIterable, Identifiable {
+    case funasrNano
+    case qwen3Asr
+    case senseVoice
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .funasrNano: return "Fun-ASR-Nano-2512"
+        case .qwen3Asr: return "Qwen3-ASR-0.6B"
+        case .senseVoice: return "SenseVoiceSmall"
+        }
+    }
+
+    /// 设置页一行说明
+    var note: String {
+        switch self {
+        case .funasrNano:
+            return "默认 · 中英混杂与方言最强（0.8B，约 1GB，速度稍慢）"
+        case .qwen3Asr:
+            return "30 语种 + 22 中文方言（0.6B，约 950MB）"
+        case .senseVoice:
+            return "轻量极速，纯中文/英文较好，混杂较弱（约 230MB）"
+        }
+    }
+
+    /// 未安装时的下载/导出命令
+    var installCommand: String {
+        switch self {
+        case .funasrNano: return "./scripts/download_models.sh funasr-nano"
+        case .qwen3Asr: return "./scripts/download_models.sh qwen3"
+        case .senseVoice: return "./scripts/export_model.sh"
         }
     }
 }
@@ -46,6 +84,15 @@ enum SettingsStore {
             defaults.string(forKey: "asrEngine").flatMap(AsrEngine.init(rawValue:)) ?? .local
         }
         set { defaults.set(newValue.rawValue, forKey: "asrEngine") }
+    }
+
+    /// 本地引擎使用的模型档位（v5）
+    static var localAsrModel: LocalAsrModel {
+        get {
+            defaults.string(forKey: "localAsrModel").flatMap(LocalAsrModel.init(rawValue:))
+                ?? .funasrNano
+        }
+        set { defaults.set(newValue.rawValue, forKey: "localAsrModel") }
     }
 
     static var dashScopeModel: String {
