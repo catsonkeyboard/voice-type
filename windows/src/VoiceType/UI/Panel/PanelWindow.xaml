@@ -1,0 +1,186 @@
+<Window x:Class="VoiceType.UI.Panel.PanelWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="VoiceType"
+        Width="360"
+        SizeToContent="Height"
+        MaxHeight="720"
+        ResizeMode="CanMinimize"
+        WindowStartupLocation="CenterScreen"
+        Background="#FAFAFA"
+        AllowDrop="True"
+        Closing="OnClosing">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- 状态头 -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="12">
+            <Ellipse x:Name="StatusDot" Width="8" Height="8" Fill="#3FB950" Margin="0,0,8,0"
+                     VerticalAlignment="Center"/>
+            <TextBlock x:Name="StatusText" FontSize="13" Foreground="#57606A"
+                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+        </StackPanel>
+        <Separator Grid.Row="0" VerticalAlignment="Bottom" Background="#E5E5E5"/>
+
+        <!-- 录音按钮 -->
+        <Button x:Name="RecordButton" Grid.Row="1" Margin="12" Padding="0,10" FontSize="14"
+                Click="OnRecordClicked" Content="开始录音"/>
+        <Separator Grid.Row="1" VerticalAlignment="Bottom" Background="#E5E5E5"/>
+
+        <!-- 会议区 -->
+        <StackPanel x:Name="MeetingSection" Grid.Row="2" Margin="12,10">
+            <Grid x:Name="MeetingIdleRow">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Button Grid.Column="0" Content="开始会议录音" Padding="10,4"
+                        Click="OnMeetingStartClicked"/>
+                <TextBlock x:Name="MeetingIdleHint" Grid.Column="1" Margin="10,0,0,0"
+                           FontSize="11" Foreground="#8B949E" TextWrapping="Wrap"
+                           VerticalAlignment="Center"/>
+                <Button x:Name="MeetingResultButton" Grid.Column="2" Content="查看结果"
+                        FontSize="11" Padding="8,2" Visibility="Collapsed"
+                        Click="OnMeetingResultClicked"/>
+            </Grid>
+
+            <Grid x:Name="MeetingRecordingRow" Visibility="Collapsed">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="● 会议录音中" Foreground="#E5484D" FontSize="13"
+                           VerticalAlignment="Center"/>
+                <TextBlock x:Name="MeetingTimer" Grid.Column="1" Margin="8,0,0,0" FontSize="13"
+                           FontFamily="Consolas" Foreground="#57606A" VerticalAlignment="Center"/>
+                <Button Grid.Column="3" Content="停止并转写" Background="#E5484D"
+                        Foreground="White" Padding="10,3" FontSize="12"
+                        Click="OnMeetingStopClicked"/>
+            </Grid>
+
+            <StackPanel x:Name="MeetingProcessingRow" Visibility="Collapsed" Margin="0,6,0,0">
+                <TextBlock x:Name="MeetingStageText" FontSize="11" Foreground="#57606A"/>
+                <ProgressBar x:Name="MeetingProgressBar" Height="6" Margin="0,4,0,0"
+                             Maximum="1"/>
+            </StackPanel>
+
+            <TextBlock x:Name="MeetingErrorText" FontSize="11" Foreground="#D29922"
+                       TextWrapping="Wrap" Visibility="Collapsed" Margin="0,6,0,0"/>
+        </StackPanel>
+        <Separator Grid.Row="2" VerticalAlignment="Bottom" Background="#E5E5E5"/>
+
+        <!-- 文件转写区 -->
+        <StackPanel x:Name="FileSection" Grid.Row="3" Margin="12,10">
+            <Border x:Name="FileDropArea" BorderBrush="#B8B8B8" BorderThickness="1"
+                    CornerRadius="8" Padding="0,10" Background="White"
+                    Drop="OnFileDrop" AllowDrop="True">
+                <StackPanel HorizontalAlignment="Center">
+                    <TextBlock Text="⬆" FontSize="18" Foreground="#8B949E"
+                               HorizontalAlignment="Center"/>
+                    <TextBlock Text="拖入音频文件转写 (wav/mp3/m4a)" FontSize="11"
+                               Foreground="#8B949E" HorizontalAlignment="Center" Margin="0,4,0,6"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Content="选择文件…" FontSize="11" Padding="8,2" Margin="0,0,8,0"
+                                Click="OnPickFileClicked"/>
+                        <Button x:Name="MeetingFileButton" Content="会议转写…" FontSize="11"
+                                Padding="8,2" Click="OnPickMeetingFileClicked"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <StackPanel x:Name="FileRunningRow" Visibility="Collapsed" Margin="0,8,0,0">
+                <TextBlock x:Name="FileProgressText" FontSize="11" Foreground="#57606A"/>
+                <ProgressBar x:Name="FileProgressBar" Height="6" Margin="0,4,0,0" Maximum="1"/>
+            </StackPanel>
+
+            <StackPanel x:Name="FileDoneRow" Visibility="Collapsed" Margin="0,8,0,0">
+                <TextBlock x:Name="FileDoneText" FontSize="11" Foreground="#24292F"
+                           TextWrapping="Wrap" MaxHeight="64" TextTrimming="CharacterEllipsis"/>
+                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                    <Button Content="复制结果" FontSize="11" Padding="8,2" Margin="0,0,8,0"
+                            Click="OnCopyFileResult"/>
+                    <Button Content="完成" FontSize="11" Padding="8,2" Click="OnFileDoneClose"/>
+                </StackPanel>
+            </StackPanel>
+
+            <TextBlock x:Name="FileErrorText" FontSize="11" Foreground="#D29922"
+                       TextWrapping="Wrap" Visibility="Collapsed" Margin="0,8,0,0"/>
+        </StackPanel>
+        <Separator Grid.Row="3" VerticalAlignment="Bottom" Background="#E5E5E5"/>
+
+        <!-- 历史 -->
+        <Grid Grid.Row="4" Margin="12,8,12,4">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <Grid>
+                <TextBlock Text="最近转写" FontSize="11" Foreground="#8B949E"/>
+                <Button Content="清空" FontSize="11" Foreground="#8B949E" HorizontalAlignment="Right"
+                        Padding="4,0" Background="Transparent" BorderThickness="0"
+                        Click="OnClearHistory"/>
+            </Grid>
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" MaxHeight="220">
+                <ItemsControl x:Name="HistoryList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,4" Background="Transparent">
+                                <Grid.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="复制原始转写"
+                                                  Click="OnCopyRawContext"
+                                                  CommandParameter="{Binding}"/>
+                                        <MenuItem Header="删除"
+                                                  Click="OnDeleteContext"
+                                                  CommandParameter="{Binding}"/>
+                                    </ContextMenu>
+                                </Grid.ContextMenu>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Text}" FontSize="13"
+                                               TextTrimming="CharacterEllipsis"
+                                               MaxHeight="36" TextWrapping="Wrap"/>
+                                    <TextBlock FontSize="10" Foreground="#8B949E">
+                                        <Run Text="{Binding CreatedAt, Mode=OneWay,
+                                            StringFormat='{}{0:MM-dd HH:mm}'}"/>
+                                    </TextBlock>
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="复制" FontSize="11" Margin="8,0,0,0"
+                                        Padding="8,2" VerticalAlignment="Top"
+                                        Click="OnCopyRecord" CommandParameter="{Binding}"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+            <TextBlock x:Name="HistoryEmpty" Grid.Row="1" Text="暂无记录" FontSize="11"
+                       Foreground="#B8B8B8" HorizontalAlignment="Center" Margin="0,16"
+                       Visibility="Collapsed"/>
+        </Grid>
+
+        <!-- 底栏 -->
+        <Grid Grid.Row="5" Background="#F0F0F0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Button Grid.Column="0" Content="⚙ 设置" Background="Transparent" BorderThickness="0"
+                    Foreground="#57606A" Padding="0,8" Click="OnOpenSettings"/>
+            <Button Grid.Column="1" Content="⏻ 退出" Background="Transparent" BorderThickness="0"
+                    Foreground="#57606A" Padding="0,8" Click="OnExit"/>
+        </Grid>
+    </Grid>
+</Window>
