@@ -1,0 +1,191 @@
+<Window x:Class="VoiceType.UI.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:VoiceType.UI.Controls"
+        Title="VoiceType 设置"
+        Width="480" Height="600"
+        WindowStartupLocation="CenterScreen"
+        Background="#FAFAFA">
+    <TabControl TabStripPlacement="Top" Margin="8">
+
+        <!-- 通用 -->
+        <TabItem Header="通用">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="12">
+                    <TextBlock Text="听写快捷键" FontWeight="Bold" Margin="0,0,0,8"/>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="全局快捷键" VerticalAlignment="Center"
+                                   Margin="0,0,12,0"/>
+                        <controls:KeyComboRecorder x:Name="HotkeyRecorder" ComboChanged="OnHotkeyChanged"/>
+                    </StackPanel>
+                    <TextBlock Text="默认 Ctrl+Alt+Space（Alt+Space 为系统快捷键，不可用）"
+                               FontSize="11" Foreground="#8B949E" Margin="0,6,0,0"/>
+
+                    <Separator Margin="0,16"/>
+
+                    <TextBlock Text="启动" FontWeight="Bold" Margin="0,0,0,8"/>
+                    <CheckBox x:Name="LaunchAtLoginCheck" Content="登录时自动启动"
+                              Checked="OnLaunchAtLoginChanged"
+                              Unchecked="OnLaunchAtLoginChanged"/>
+
+                    <Separator Margin="0,16"/>
+
+                    <TextBlock Text="模型" FontWeight="Bold" Margin="0,0,0,8"/>
+                    <ItemsControl x:Name="ModelStatusList" Margin="0,0,0,4">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="160"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding Name}" FontSize="12"
+                                               VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding Status}" FontSize="12"
+                                               Foreground="{Binding Color}" Grid.Column="1"
+                                               VerticalAlignment="Center"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                        <Button Content="打开模型目录" Padding="10,4" Margin="0,0,8,0"
+                                Click="OnOpenModelsDir"/>
+                        <Button Content="刷新状态" Padding="10,4" Click="OnRefreshModels"/>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
+        <!-- 识别 -->
+        <TabItem Header="识别">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="12">
+                    <TextBlock Text="识别引擎" FontWeight="Bold" Margin="0,0,0,8"/>
+                    <RadioButton x:Name="EngineLocalRadio" GroupName="Engine"
+                                 Content="本地识别（默认，纯离线）"
+                                 Checked="OnEngineChanged"/>
+                    <RadioButton x:Name="EngineDashRadio" GroupName="Engine"
+                                 Content="云端 Fun-ASR-Realtime（实时流式）"
+                                 Checked="OnEngineChanged" Margin="0,4,0,0"/>
+                    <TextBlock x:Name="EngineCloudHint"
+                               Text="云端模式下，录音音频将实时发送至阿里云百炼进行识别；失败时自动回退本地引擎。"
+                               FontSize="11" Foreground="#D29922" TextWrapping="Wrap"
+                               Visibility="Collapsed" Margin="0,8,0,0"/>
+
+                    <!-- 本地模型选择 -->
+                    <StackPanel x:Name="LocalModelSection" Margin="0,16,0,0">
+                        <TextBlock Text="本地识别模型" FontWeight="Bold" Margin="0,0,0,8"/>
+                        <ComboBox x:Name="LocalModelCombo" SelectionChanged="OnLocalModelChanged"
+                                  DisplayMemberPath="Name" SelectedValuePath="Value"
+                                  Width="280" HorizontalAlignment="Left"/>
+                        <TextBlock x:Name="LocalModelNote" FontSize="11" Foreground="#8B949E"
+                                   Margin="0,6,0,0"/>
+                        <ItemsControl x:Name="LocalModelStatusList" Margin="0,8,0,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="0,3">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="160"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Name}" FontSize="12"
+                                                       VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Status}" FontSize="12"
+                                                       Foreground="{Binding Color}" Grid.Column="1"
+                                                       VerticalAlignment="Center"/>
+                                        </Grid>
+                                        <TextBlock Text="{Binding Note}" FontSize="11"
+                                                   Foreground="#8B949E"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock x:Name="InstallCommandText" FontSize="11"
+                                   FontFamily="Consolas" Foreground="#57606A"
+                                   Visibility="Collapsed" Margin="0,4,0,0"/>
+                    </StackPanel>
+
+                    <Separator Margin="0,16"/>
+
+                    <TextBlock Text="说话人分离（会议转写）" FontWeight="Bold" Margin="0,0,0,8"/>
+                    <TextBlock x:Name="DiarizationStatus" FontSize="12" Margin="0,0,0,4"/>
+                    <TextBlock x:Name="DiarizationInstallHint" FontSize="11"
+                               FontFamily="Consolas" Foreground="#57606A"
+                               Visibility="Collapsed"/>
+
+                    <!-- DashScope -->
+                    <StackPanel x:Name="DashSection" Margin="0,16,0,0" Visibility="Collapsed">
+                        <TextBlock Text="阿里百炼 (DashScope)" FontWeight="Bold" Margin="0,0,0,8"/>
+                        <TextBlock Text="API Key（存储于 Windows 凭据管理器）" FontSize="11"
+                                   Foreground="#8B949E"/>
+                        <PasswordBox x:Name="DashKeyBox" PasswordChanged="OnDashKeyChanged"
+                                     Margin="0,4,0,8"/>
+                        <TextBlock Text="模型" FontSize="11" Foreground="#8B949E"/>
+                        <TextBox x:Name="DashModelBox" TextChanged="OnDashModelChanged"
+                                 Margin="0,4,0,8"/>
+                        <Button x:Name="DashTestButton" Content="测试连接" Padding="10,4"
+                                HorizontalAlignment="Left" Click="OnDashTest"/>
+                        <TextBlock x:Name="DashTestResult" FontSize="11" Margin="0,6,0,0"
+                                   TextWrapping="Wrap"/>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
+        <!-- 润色 -->
+        <TabItem Header="润色">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="12">
+                    <TextBlock Text="智能润色" FontWeight="Bold" Margin="0,0,0,8"/>
+                    <CheckBox x:Name="PolishEnabledCheck" Content="启用润色（关闭后输出原始转写）"
+                              Checked="OnPolishEnabledChanged" Unchecked="OnPolishEnabledChanged"/>
+                    <TextBlock Text="风格" FontSize="12" Margin="0,10,0,4"/>
+                    <ComboBox x:Name="PolishStyleCombo" SelectionChanged="OnPolishStyleChanged"
+                              Width="200" HorizontalAlignment="Left"/>
+
+                    <Separator Margin="0,16"/>
+
+                    <TextBlock Text="服务（OpenAI 兼容，默认本地 Ollama）" FontWeight="Bold"
+                               Margin="0,0,0,8"/>
+                    <TextBlock Text="服务商预设" FontSize="11" Foreground="#8B949E"/>
+                    <ComboBox x:Name="PresetCombo" SelectionChanged="OnPresetSelected"
+                              Width="280" HorizontalAlignment="Left" Margin="0,4,0,8"/>
+                    <TextBlock Text="服务地址" FontSize="11" Foreground="#8B949E"/>
+                    <TextBox x:Name="PolishUrlBox" TextChanged="OnPolishUrlChanged"
+                             Margin="0,4,0,8"/>
+                    <TextBlock Text="API Key（本地 Ollama 留空）" FontSize="11" Foreground="#8B949E"/>
+                    <PasswordBox x:Name="PolishKeyBox" PasswordChanged="OnPolishKeyChanged"
+                                 Margin="0,4,0,8"/>
+                    <TextBlock Text="模型" FontSize="11" Foreground="#8B949E"/>
+                    <TextBox x:Name="PolishModelBox" TextChanged="OnPolishModelChanged"
+                             Margin="0,4,0,8"/>
+                    <Button x:Name="ProbeButton" Content="测试连接" Padding="10,4"
+                            HorizontalAlignment="Left" Click="OnProbePolish"/>
+                    <TextBlock x:Name="ProbeResult" FontSize="11" Margin="0,6,0,0"
+                               TextWrapping="Wrap"/>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
+        <!-- 热词 -->
+        <TabItem Header="热词">
+            <Grid Margin="12">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <TextBlock Text="每行一个热词（人名、品牌、专业术语等，仅支持中文词）。识别后按拼音相似度自动纠正。"
+                           FontSize="11" Foreground="#8B949E" TextWrapping="Wrap"/>
+                <TextBox x:Name="HotwordsBox" Grid.Row="1" AcceptsReturn="True"
+                         TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+                         FontFamily="Consolas" Margin="0,8"
+                         TextChanged="OnHotwordsChanged"/>
+                <TextBlock x:Name="HotwordsCount" Grid.Row="2" FontSize="11"
+                           Foreground="#8B949E"/>
+            </Grid>
+        </TabItem>
+    </TabControl>
+</Window>

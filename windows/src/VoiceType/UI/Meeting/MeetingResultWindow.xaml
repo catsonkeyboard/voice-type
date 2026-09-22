@@ -1,0 +1,77 @@
+<Window x:Class="VoiceType.UI.Meeting.MeetingResultWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="会议转写"
+        Width="640" Height="520"
+        WindowStartupLocation="CenterScreen">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- 头部 -->
+        <Grid Grid.Row="0" Margin="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="会议转写" FontWeight="Bold" FontSize="14"/>
+                <TextBlock x:Name="MetaText" FontSize="11" Foreground="#8B949E" Margin="0,2,0,0"/>
+            </StackPanel>
+            <Button Grid.Column="1" Content="复制全文" Padding="10,3" Margin="8,0,0,0"
+                    Click="OnCopyAll"/>
+            <Button Grid.Column="2" Content="导出 Markdown" Padding="10,3" Margin="8,0,0,0"
+                    Click="OnExportMarkdown"/>
+            <Button x:Name="MinutesButton" Grid.Column="3" Content="生成纪要" Padding="10,3"
+                    Margin="8,0,0,0" Click="OnGenerateMinutes"/>
+        </Grid>
+        <Separator Grid.Row="0" VerticalAlignment="Bottom" Background="#E5E5E5"/>
+
+        <!-- 正文 -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="12,8">
+            <StackPanel>
+                <TextBlock x:Name="DegradedHint"
+                           Text="⚠ 说话人分离不可用，本稿为整段转写"
+                           FontSize="11" Foreground="#D29922" Visibility="Collapsed"
+                           Margin="0,0,0,8"/>
+                <ItemsControl x:Name="SegmentList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Button Content="{Binding SpeakerLabel}" FontSize="11"
+                                        FontWeight="Bold" Padding="8,3" Margin="0,0,10,0"
+                                        Background="{Binding SpeakerBrush}" BorderThickness="0"
+                                        Click="OnRenameSpeaker" CommandParameter="{Binding Speaker}"
+                                        ToolTip="点击改名"/>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="{Binding TimestampText}" FontSize="10"
+                                               Foreground="#8B949E"/>
+                                    <TextBlock Text="{Binding Text}" FontSize="13"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <Separator x:Name="MinutesSeparator" Visibility="Collapsed" Margin="0,12"/>
+                <StackPanel x:Name="MinutesSection" Visibility="Collapsed">
+                    <TextBlock Text="✨ 会议纪要" FontWeight="Bold" FontSize="13" Margin="0,0,0,4"/>
+                    <Button Content="复制" FontSize="11" Padding="8,2" HorizontalAlignment="Left"
+                            Margin="0,0,0,6" Click="OnCopyMinutes"/>
+                    <TextBlock x:Name="MinutesText" FontSize="13" TextWrapping="Wrap"/>
+                </StackPanel>
+                <TextBlock x:Name="MinutesError" FontSize="11"
+                           Foreground="#E5484D" Visibility="Collapsed" Margin="0,8,0,0"/>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Window>

@@ -2,7 +2,7 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-**VoiceType** is a macOS menu bar dictation tool that turns messy speech into clean, publish-ready text — on-device by default.
+**VoiceType** is a menu bar dictation tool that turns messy speech into clean, publish-ready text — on-device by default. Runs on **macOS** (Swift/SwiftUI) and **Windows** (WPF/.NET, see [`windows/`](windows/)).
 
 Press a global hotkey (default `⌥Space`) anywhere, speak naturally, and the transcribed text is typed straight into your cursor position. A local LLM then polishes the raw transcript in real time: filler words are removed, self-corrections are resolved ("meeting tomorrow afternoon… no wait, 9 AM" → "meeting tomorrow at 9 AM"), and spoken lists are auto-formatted into numbered bullets.
 
@@ -38,6 +38,16 @@ Prerequisites: Xcode 15+, `brew install xcodegen`
 Models install to `~/Library/Application Support/VoiceType/models/`. `download_models.sh` prefers ModelScope (faster in China) and falls back to GitHub releases automatically.
 
 The SenseVoice export script converts a locally cached FunASR checkpoint (ModelScope cache) using a Python venv — adjust the `VENV` path at the top of the script to your environment. Alternatively, download the prebuilt model from sherpa-onnx releases (`sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17`, ~230MB) and place `model.int8.onnx` + `tokens.txt` in the models directory.
+
+## Windows
+
+The Windows port lives in [`windows/`](windows/) — WPF on .NET 10, x64, feature-parity with the macOS app (same sherpa-onnx v1.13.3 runtime and model files, same cloud/polish protocols). Details: [`windows/README.md`](windows/README.md); porting notes: [`windows/MIGRATION.md`](windows/MIGRATION.md).
+
+    powershell -ExecutionPolicy Bypass -File windows\scripts\download_models.ps1 funasr-nano
+    powershell -ExecutionPolicy Bypass -File windows\scripts\build.ps1
+    dotnet test windows\src\VoiceType.sln --filter Category!=Integration
+
+Notable differences: the default hotkey is `Ctrl+Alt+Space` (Alt+Space is reserved by Windows), text injection uses `SendInput` with no permission prompt (elevated windows fall back to clipboard), and API keys are stored in Windows Credential Manager.
 
 ## Smart polishing (v2)
 

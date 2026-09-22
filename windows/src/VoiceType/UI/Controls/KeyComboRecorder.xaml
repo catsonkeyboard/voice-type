@@ -1,0 +1,11 @@
+<UserControl x:Class="VoiceType.UI.Controls.KeyComboRecorder"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Focusable="True">
+    <Button x:Name="CaptureButton" MinWidth="150" Padding="10,4"
+            HorizontalContentAlignment="Center" Click="OnButtonClick">
+        <Button.Content>
+            <TextBlock x:Name="Label" Text="{Binding}" />
+        </Button.Content>
+    </Button>
+</UserControl>
