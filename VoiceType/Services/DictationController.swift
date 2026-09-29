@@ -15,6 +15,8 @@ final class DictationController {
     private var capTimer: Timer?
     private var promptedAccessibility = false
     private var cloudSession: DashScopeAsrSession?
+    /// 云端会话在录音中途断开：本次结束直接走本地识别并提示
+    private var cloudDroppedMidway = false
 
     init(state: AppState, asr: AsrService, history: HistoryStore, polish: PolishService) {
         self.state = state
@@ -63,6 +65,7 @@ final class DictationController {
                 return
             }
             do {
+                cloudDroppedMidway = false
                 if engine == .dashscope { setupCloudSession() }
                 recorder.onLevel = { [weak self] level in
                     self?.state.micLevel = level
@@ -87,12 +90,24 @@ final class DictationController {
         }
     }
 
-    /// 并行建立云端会话；建连失败仅使本次云端不可用（finish 时走本地回退）
+    /// 并行建立云端会话；建连失败仅使本次云端不可用（finish 时走本地回退）。
+    /// 录音中途连接中断时立即切换为本地模式（音频全程在本地累积，无内容丢失）。
     private func setupCloudSession() {
         let session = DashScopeAsrSession(
             apiKey: SettingsStore.dashScopeAPIKey, model: SettingsStore.dashScopeModel)
         session.onPartial = { [weak self] text in
             Task { @MainActor in self?.state.partialText = text }
+        }
+        session.onFailure = { [weak self] _ in
+            Task { @MainActor in
+                guard let self, self.cloudSession === session else { return }
+                // 仅当仍是当前会话时清除（避免竞态清掉下一次的会话）
+                self.cloudSession = nil
+                self.state.partialText = nil
+                self.cloudDroppedMidway = true
+                // 本地音频完整保留，继续录音；结束时直接走本地识别
+                HUDController.shared.flash("云端连接中断，将使用本地识别", state: self.state)
+            }
         }
         cloudSession = session
         Task { [weak self, session] in
@@ -108,13 +123,16 @@ final class DictationController {
     }
 
     private func finishRecording() async {
-        guard state.phase == .recording else { return }
+        // 无论当前处于什么状态，先解除定时器，避免非 recording 路径残留强引用
         capTimer?.invalidate()
         capTimer = nil
+        guard state.phase == .recording else { return }
         let samples = recorder.stop()
         recorder.onChunk = nil
         let session = cloudSession
         cloudSession = nil
+        let droppedMidway = cloudDroppedMidway
+        cloudDroppedMidway = false
         state.partialText = nil
 
         let duration = Double(samples.count) / 16000.0
@@ -141,7 +159,11 @@ final class DictationController {
                 if SettingsStore.asrEngine == .dashscope { cloudDegraded = true }
                 text = try await asr.transcribe(samples: samples)
             }
-            text = HotwordCorrector(hotwords: SettingsStore.hotwords).correct(text)
+            // 热词纠正在后台执行（拼音转换+编辑距离开销与文本长度成正比）
+            let hotwords = SettingsStore.hotwords
+            text = await Task.detached(priority: .userInitiated) {
+                HotwordCorrector(hotwords: hotwords).correct(text)
+            }.value
             guard !text.isEmpty else {
                 state.phase = .idle
                 HUDController.shared.hide()
@@ -164,7 +186,8 @@ final class DictationController {
             state.phase = .idle
             switch result {
             case .injected:
-                if cloudDegraded {
+                if cloudDegraded && !droppedMidway {
+                    // 中途断开已在断线时提示过，这里不重复
                     HUDController.shared.flash("云端不可用，已用本地识别", state: state)
                 } else if polishDegraded {
                     HUDController.shared.flash("润色不可用，已输出原文", state: state)
@@ -204,7 +227,10 @@ final class DictationController {
                 if text.isEmpty {
                     state.fileJob = .failed("未识别到语音内容")
                 } else {
-                    let corrected = HotwordCorrector(hotwords: SettingsStore.hotwords).correct(text)
+                    let hotwords = SettingsStore.hotwords
+                    let corrected = await Task.detached(priority: .userInitiated) {
+                        HotwordCorrector(hotwords: hotwords).correct(text)
+                    }.value
                     history.add(text: corrected, durationSeconds: 0, source: "file")
                     state.fileJob = .done(text: corrected)
                 }

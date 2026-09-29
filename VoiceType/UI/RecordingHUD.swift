@@ -34,7 +34,7 @@ final class HUDController {
         panel?.orderFrontRegardless()
     }
 
-    /// 显示一条短消息后自动隐藏
+    /// 显示一条短消息后自动隐藏；若此时仍在录音则回到录音显示而非隐藏
     func flash(_ message: String, state: AppState, seconds: Double = 2.0) {
         state.hudMessage = message
         show(state: state)
@@ -43,7 +43,13 @@ final class HUDController {
             try? await Task.sleep(for: .seconds(seconds))
             guard !Task.isCancelled else { return }
             state.hudMessage = nil
-            self?.hide()
+            guard let self else { return }
+            if state.phase == .recording {
+                // 录音仍在进行：清掉一次性提示，继续展示录音状态
+                self.show(state: state)
+            } else {
+                self.hide()
+            }
         }
     }
 

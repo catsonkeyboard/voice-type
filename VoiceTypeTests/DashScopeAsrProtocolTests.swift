@@ -116,3 +116,44 @@ final class DashScopeAsrProtocolTests: XCTestCase {
         XCTAssertEqual(a.finalText, "")
     }
 }
+
+/// 会话终态语义（不依赖网络）：已断线/已取消的会话上
+/// send 丢弃、finish 立即抛错（不空等 15s 超时）、onFailure 恰好触发一次
+final class DashScopeSessionTerminalStateTests: XCTestCase {
+    func testFinishAfterCancelThrowsImmediately() async {
+        let session = DashScopeAsrSession(apiKey: "k", model: "m")
+        var failureCount = 0
+        session.onFailure = { _ in failureCount += 1 }
+        session.cancel()
+
+        let start = Date()
+        do {
+            _ = try await session.finish()
+            XCTFail("取消后的会话 finish 应抛错")
+        } catch {}
+        XCTAssertLessThan(Date().timeIntervalSince(start), 5, "应立即抛错而非等超时")
+        XCTAssertEqual(failureCount, 1, "onFailure 恰好触发一次")
+    }
+
+    func testSendAfterTerminalIsDropped() async {
+        let session = DashScopeAsrSession(apiKey: "k", model: "m")
+        session.cancel()
+        // 不应崩溃/不应挂起；已终态直接丢弃
+        session.send(samples: [0, 0, 0])
+        let exp = expectation(description: "finish 立即抛错")
+        Task {
+            do { _ = try await session.finish(); XCTFail("应抛错") } catch {}
+            exp.fulfill()
+        }
+        await fulfillment(of: [exp], timeout: 5)
+    }
+
+    func testFailAllIsExactlyOnce() {
+        let session = DashScopeAsrSession(apiKey: "k", model: "m")
+        var failureCount = 0
+        session.onFailure = { _ in failureCount += 1 }
+        session.cancel()
+        session.cancel()  // 第二次触发路径（幂等）
+        XCTAssertEqual(failureCount, 1)
+    }
+}
