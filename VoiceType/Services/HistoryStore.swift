@@ -39,7 +39,6 @@ final class HistoryStore {
                 text: text, durationSeconds: durationSeconds, source: source, rawText: rawText))
         try? context.save()
         trim()
-        try? context.save()
     }
 
     func recent(limit: Int = 50) -> [TranscriptRecord] {
@@ -59,12 +58,21 @@ final class HistoryStore {
         try? context.save()
     }
 
+    /// 只保留最近 maxRecords 条：先 count 判断是否超限，
+    /// 超限时仅 fetch 待删除的 offset 区间（倒序第 maxRecords 条之后），不全表拉取
     private func trim() {
-        let all = (try? context.fetch(
-            FetchDescriptor<TranscriptRecord>(
-                sortBy: [SortDescriptor(\.createdAt, order: .reverse)]))) ?? []
-        for record in all.dropFirst(maxRecords) {
+        let count = (try? context.fetchCount(FetchDescriptor<TranscriptRecord>())) ?? 0
+        guard count > maxRecords else { return }
+        var descriptor = FetchDescriptor<TranscriptRecord>(
+            sortBy: [SortDescriptor(\.createdAt, order: .reverse)])
+        descriptor.fetchOffset = maxRecords
+        descriptor.fetchLimit = count - maxRecords
+        let overflow = (try? context.fetch(descriptor)) ?? []
+        for record in overflow {
             context.delete(record)
+        }
+        if !overflow.isEmpty {
+            try? context.save()
         }
     }
 }

@@ -21,6 +21,21 @@ final class HotwordCorrectorTests: XCTestCase {
         XCTAssertEqual(result, "盛派公司发布了新品")
     }
 
+    func testFirstCharInitialMismatchStillCorrected() {
+        // 首字声母平翘舌误识（z↔c）：「张涛」(zhangtao) 误识为「仓涛」(cangtao)，
+        // 编辑距离 2 恰在阈值内，应纠正——保护首字误识不被任何前置剪枝跳过
+        let corrector = HotwordCorrector(hotwords: ["张涛"])
+        let result = corrector.correct("明天上午找仓涛开会")
+        XCTAssertEqual(result, "明天上午找张涛开会")
+    }
+
+    func testRetroflexAndDentalInterchange() {
+        // 「诗」(shi) vs 「思」(si)：sh/s 平翘舌互换
+        let corrector = HotwordCorrector(hotwords: ["诗涵"])
+        let result = corrector.correct("她叫思涵")
+        XCTAssertEqual(result, "她叫诗涵")
+    }
+
     func testDoesNotTouchUnrelatedText() {
         let corrector = HotwordCorrector(hotwords: ["朗诗德"])
         let text = "今天天气很好，我们去公园散步。"

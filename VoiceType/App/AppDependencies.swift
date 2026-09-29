@@ -21,7 +21,15 @@ final class AppDependencies {
     private init() {
         SettingsStore.migrateSecretsToKeychainIfNeeded()
         state = AppState()
-        container = try! ModelContainer(for: TranscriptRecord.self)
+        // 磁盘持久化失败（如 store 损坏）时回退内存容器：
+        // 历史记录不可用不应导致整个听写 App 崩溃。
+        // 内存容器无磁盘 I/O，仅 schema 非法才会失败（编译期已定，实际不可达）
+        if let onDisk = try? ModelContainer(for: TranscriptRecord.self) {
+            container = onDisk
+        } else {
+            let config = ModelConfiguration(isStoredInMemoryOnly: true)
+            container = try! ModelContainer(for: TranscriptRecord.self, configurations: config)
+        }
         history = HistoryStore(container: container)
         asr = AsrService()
         polish = PolishService()

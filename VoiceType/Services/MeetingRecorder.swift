@@ -6,6 +6,9 @@ final class MeetingRecorder {
     static let maxSeconds: Double = 3 * 3600
 
     private let recorder = AudioRecorder()
+    /// 缓存的写入格式（每 chunk 新建 AVAudioFormat 有开销且完全相同）
+    private static let writeFormat = AVAudioFormat(
+        commonFormat: .pcmFormatFloat32, sampleRate: 16000, channels: 1, interleaved: false)!
     private var file: AVAudioFile?
     private(set) var startedAt: Date?
     private(set) var fileURL: URL?
@@ -21,9 +24,7 @@ final class MeetingRecorder {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyyMMdd-HHmmss"
         let url = dir.appendingPathComponent("\(formatter.string(from: .now)).wav")
-        let format = AVAudioFormat(
-            commonFormat: .pcmFormatFloat32, sampleRate: 16000, channels: 1, interleaved: false)!
-        file = try AVAudioFile(forWriting: url, settings: format.settings)
+        file = try AVAudioFile(forWriting: url, settings: Self.writeFormat.settings)
         fileURL = url
         autoStopFired = false
         recorder.onChunk = { [weak self] chunk in
@@ -35,11 +36,9 @@ final class MeetingRecorder {
 
     private func append(_ chunk: [Float]) {
         guard let file, !chunk.isEmpty else { return }
-        let format = AVAudioFormat(
-            commonFormat: .pcmFormatFloat32, sampleRate: 16000, channels: 1, interleaved: false)!
         guard
             let buffer = AVAudioPCMBuffer(
-                pcmFormat: format, frameCapacity: AVAudioFrameCount(chunk.count))
+                pcmFormat: Self.writeFormat, frameCapacity: AVAudioFrameCount(chunk.count))
         else { return }
         buffer.frameLength = AVAudioFrameCount(chunk.count)
         chunk.withUnsafeBufferPointer { src in

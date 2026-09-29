@@ -15,3 +15,4 @@ TestResults/
 # sherpa-onnx 原生依赖与头文件由 NuGet / fetch_deps.ps1 拉取（体积大）
 windows/src/VoiceType/runtimes/
 windows/src/VoiceType/Interop/SherpaOnnx/include/
+.workbuddy/
