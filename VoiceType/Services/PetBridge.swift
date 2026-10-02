@@ -48,7 +48,8 @@ enum PetAction: Equatable {
     case ignore
 }
 
-/// 录音启动期间到达的结束或取消请求，启动完成后执行
+/// 录音启动期间到达的结束或取消请求，取消优先于结束。
+/// 启动成功后立刻执行；启动失败时，记下的是结束就回传失败原因，记下的是取消就不回传。
 enum PendingEnd: Equatable {
     case finish
     case cancel
