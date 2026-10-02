@@ -57,6 +57,24 @@ Polishing requires a local [Ollama](https://ollama.com) (≥0.19 for the MLX bac
 
 It works out of the box against `http://localhost:11434/v1`. In Settings → Polish you can toggle the feature, switch between "smart cleanup" and "formal rewrite" styles, pick another model, or point to any OpenAI-compatible endpoint (LM Studio, cloud APIs). History keeps the pre-polish transcript (right-click → copy raw text). Provider presets (Ollama / Alibaba Model Studio / DeepSeek / OpenAI) fill in the endpoint and a recommended model with one click.
 
+## Pet integration (v6)
+
+The desktop pet (Pet) can ask VoiceType to record and recognize through a URL scheme; the result goes back to the pet instead of being pasted at the cursor:
+
+    voicetype://dictate?session=<id>&callback=pet%3A%2F%2Ftranscript   # start recording
+    voicetype://stop?session=<id>                                       # stop and recognize
+    voicetype://cancel?session=<id>                                     # discard this recording
+
+    pet://transcript?session=<id>&text=<text>      # callback: recognized
+    pet://transcript?session=<id>&error=<reason>   # callback: empty / mic_denied / not_ready / busy / failed
+
+- The only accepted callback is `pet://transcript`; any other address is refused
+- These dictations do not touch the clipboard or synthesize ⌘V; hotword correction and polishing still apply, and the history records them with source `pet`
+- The recording HUD shows as usual; VoiceType's own hotkey dictation is unaffected
+- While VoiceType is busy (recording, recognizing, polishing, or recording a meeting) it answers `busy` and leaves the work in progress alone
+
+Design: `docs/superpowers/specs/2026-10-02-voice-type-v6-pet-bridge-design.md`.
+
 ## First-run permissions
 
 1. **Microphone** — system prompt appears on first recording

@@ -2,6 +2,7 @@ import SwiftUI
 
 @main
 struct VoiceTypeApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var deps = AppDependencies.shared
 
     private var menuBarIcon: String {

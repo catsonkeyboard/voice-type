@@ -50,6 +50,24 @@ Windows 版位于 [`windows/`](windows/)——WPF / .NET 10 / x64，与 macOS �
 
 默认配置即用（`http://localhost:11434/v1`）。设置 → 润色 可关闭功能、切换"智能清理/完全书面化"风格、更换模型或指向任何 OpenAI 兼容服务（如 LM Studio、云端 API）。历史记录保留润色前原文（右键 → 复制原始转写）。设置内置服务商预设（本地 Ollama / 阿里百炼 / DeepSeek / OpenAI），一键填充地址与推荐模型。
 
+## 桌宠联动（v6）
+
+桌宠 Pet 可以通过 URL scheme 让 VoiceType 录音识别，结果回传给桌宠，不粘贴到光标处：
+
+    voicetype://dictate?session=<id>&callback=pet%3A%2F%2Ftranscript   # 开始录音
+    voicetype://stop?session=<id>                                       # 结束并识别
+    voicetype://cancel?session=<id>                                     # 丢弃这次录音
+
+    pet://transcript?session=<id>&text=<文字>     # 回传：识别成功
+    pet://transcript?session=<id>&error=<原因>    # 回传：empty / mic_denied / not_ready / busy / failed
+
+- 回调只接受 `pet://transcript`，其他地址一律拒绝
+- 这类听写不写剪贴板、不模拟 ⌘V；热词纠正与润色照常，历史记录里来源为 `pet`
+- 录音 HUD 照常显示；VoiceType 自己的快捷键听写不受影响
+- VoiceType 正忙（录音、识别、润色或会议录音中）时回传 `busy`，不打断正在进行的事
+
+设计见 `docs/superpowers/specs/2026-10-02-voice-type-v6-pet-bridge-design.md`。
+
 ## 首次运行授权
 
 1. **麦克风**：首次录音时系统弹窗，允许即可

@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 
-/// 听写编排：快捷键/面板触发 → 录音 → 识别 → 热词纠正 → 注入 → 历史。
+/// 听写编排：快捷键/面板/桌宠触发 → 录音 → 识别 → 热词纠正 → 注入或回传 → 历史。
 @MainActor
 final class DictationController {
     static let maxRecordingSeconds: TimeInterval = 300
@@ -17,6 +17,17 @@ final class DictationController {
     private var cloudSession: DashScopeAsrSession?
     /// 云端会话在录音中途断开：本次结束直接走本地识别并提示
     private var cloudDroppedMidway = false
+    /// 当前这次听写的去向；结束或取消时复位为 .cursor
+    private var target: DictationTarget = .cursor
+    /// 录音正在启动（等麦克风授权）。这期间不再接受新的开始
+    private var starting = false
+    /// 启动期间桌宠已经要求结束或取消：启动完成后立刻执行
+    private var pendingEnd: PendingEnd?
+
+    private enum PendingEnd {
+        case finish
+        case cancel
+    }
 
     init(state: AppState, asr: AsrService, history: HistoryStore, polish: PolishService) {
         self.state = state
@@ -31,9 +42,11 @@ final class DictationController {
             HUDController.shared.flash("会议录音进行中，听写不可用", state: state)
             return
         }
+        // 录音正在启动：这一下不能再开一次
+        guard !starting else { return }
         switch state.phase {
         case .idle, .error:
-            startRecording()
+            startRecording(target: .cursor)
         case .recording:
             Task { await finishRecording() }
         case .transcribing, .polishing:
@@ -41,7 +54,44 @@ final class DictationController {
         }
     }
 
-    private func startRecording() {
+    /// 桌宠通过 voicetype:// 发来的请求（v6）
+    func handle(_ request: PetRequest) {
+        var idle = false
+        if !starting {
+            switch state.phase {
+            case .idle, .error: idle = true
+            default: break
+            }
+        }
+        var meetingRecording = false
+        if case .recording = state.meeting { meetingRecording = true }
+        let action = request.action(
+            idle: idle, recording: starting || state.phase == .recording,
+            meetingRecording: meetingRecording, target: target)
+        switch action {
+        case .start(let session, let callback):
+            startRecording(target: .pet(session: session, callback: callback))
+        case .finish:
+            if starting {
+                pendingEnd = .finish
+            } else {
+                Task { await finishRecording() }
+            }
+        case .cancel:
+            if starting {
+                pendingEnd = .cancel
+            } else {
+                cancelRecording()
+            }
+        case .refuse(let session, let callback, let reason):
+            PetCallback.send(callback: callback, session: session, outcome: .failure(reason))
+        case .ignore:
+            break
+        }
+    }
+
+    private func startRecording(target: DictationTarget) {
+        self.target = target
         let engine = SettingsStore.asrEngine
         switch engine {
         case .local:
@@ -49,19 +99,25 @@ final class DictationController {
             guard state.modelsReady else {
                 state.phase = .error(AsrError.modelMissing.localizedDescription)
                 HUDController.shared.flash("模型未安装，请查看设置", state: state)
+                failStart(.notReady)
                 return
             }
         case .dashscope:
             guard !SettingsStore.dashScopeAPIKey.isEmpty else {
                 state.phase = .error(DashScopeError.notConfigured.localizedDescription)
                 HUDController.shared.flash("请在设置 → 识别 中填写 DashScope API Key", state: state)
+                failStart(.notReady)
                 return
             }
         }
+        starting = true
+        pendingEnd = nil
         Task {
             guard await AudioRecorder.requestPermission() else {
+                starting = false
                 state.phase = .error("麦克风未授权")
                 HUDController.shared.flash("麦克风未授权，请在系统设置中允许", state: state)
+                failStart(.micDenied)
                 return
             }
             do {
@@ -82,12 +138,40 @@ final class DictationController {
                     Task { @MainActor in await self?.finishRecording() }
                 }
             } catch {
+                starting = false
                 cloudSession?.cancel()
                 cloudSession = nil
                 state.phase = .error(error.localizedDescription)
                 HUDController.shared.flash(error.localizedDescription, state: state)
+                failStart(.failed)
+                return
+            }
+            starting = false
+            // 启动期间桌宠已经要求结束或取消：现在执行
+            let early = pendingEnd
+            pendingEnd = nil
+            switch early {
+            case .finish:
+                await finishRecording()
+            case .cancel:
+                cancelRecording()
+            case nil:
+                break
             }
         }
+    }
+
+    /// 录音没能开始：若由桌宠发起，把原因回传；去向复位
+    private func failStart(_ reason: PetFailure) {
+        reply(target, .failure(reason))
+        target = .cursor
+        pendingEnd = nil
+    }
+
+    /// 只有桌宠发起的听写才回传
+    private func reply(_ target: DictationTarget, _ outcome: PetOutcome) {
+        guard case .pet(let session, let callback) = target else { return }
+        PetCallback.send(callback: callback, session: session, outcome: outcome)
     }
 
     /// 并行建立云端会话；建连失败仅使本次云端不可用（finish 时走本地回退）。
@@ -127,6 +211,9 @@ final class DictationController {
         capTimer?.invalidate()
         capTimer = nil
         guard state.phase == .recording else { return }
+        // 去向在这里取走：识别期间开始的下一次听写不受影响
+        let target = self.target
+        self.target = .cursor
         let samples = recorder.stop()
         recorder.onChunk = nil
         let session = cloudSession
@@ -140,6 +227,7 @@ final class DictationController {
             session?.cancel()
             state.phase = .idle
             HUDController.shared.hide()
+            reply(target, .failure(.empty))
             return
         }
         DebugAudioDump.write(samples: samples)
@@ -167,6 +255,7 @@ final class DictationController {
             guard !text.isEmpty else {
                 state.phase = .idle
                 HUDController.shared.hide()
+                reply(target, .failure(.empty))
                 return
             }
             var rawText: String? = nil
@@ -181,19 +270,24 @@ final class DictationController {
                 }
             }
             history.add(
-                text: text, durationSeconds: duration, source: "dictation", rawText: rawText)
+                text: text, durationSeconds: duration,
+                source: target == .cursor ? "dictation" : "pet", rawText: rawText)
+            // 中途断开已在断线时提示过，这里不重复
+            let degraded: String? =
+                cloudDegraded && !droppedMidway
+                ? "云端不可用，已用本地识别" : (polishDegraded ? "润色不可用，已输出原文" : nil)
+            if case .pet = target {
+                // 桌宠发起：回传文字，不写剪贴板、不模拟 ⌘V、不引导辅助功能授权
+                state.phase = .idle
+                reply(target, .text(text))
+                showDegraded(degraded)
+                return
+            }
             let result = TextInjector.inject(text)
             state.phase = .idle
             switch result {
             case .injected:
-                if cloudDegraded && !droppedMidway {
-                    // 中途断开已在断线时提示过，这里不重复
-                    HUDController.shared.flash("云端不可用，已用本地识别", state: state)
-                } else if polishDegraded {
-                    HUDController.shared.flash("润色不可用，已输出原文", state: state)
-                } else {
-                    HUDController.shared.hide()
-                }
+                showDegraded(degraded)
             case .copiedToClipboard:
                 HUDController.shared.flash("已复制到剪贴板，请按 ⌘V 粘贴", state: state)
                 // 首次降级时引导授权辅助功能，授权后即可直接注入
@@ -205,7 +299,33 @@ final class DictationController {
         } catch {
             state.phase = .error(error.localizedDescription)
             HUDController.shared.flash("识别失败：\(error.localizedDescription)", state: state)
+            reply(target, .failure(.failed))
         }
+    }
+
+    /// 降级提示显示一下；没有降级就收起 HUD
+    private func showDegraded(_ message: String?) {
+        if let message {
+            HUDController.shared.flash(message, state: state)
+        } else {
+            HUDController.shared.hide()
+        }
+    }
+
+    /// 丢弃当前录音：不识别、不回传（桌宠取消了这次说话）
+    private func cancelRecording() {
+        capTimer?.invalidate()
+        capTimer = nil
+        guard state.phase == .recording else { return }
+        _ = recorder.stop()
+        recorder.onChunk = nil
+        cloudSession?.cancel()
+        cloudSession = nil
+        cloudDroppedMidway = false
+        state.partialText = nil
+        target = .cursor
+        state.phase = .idle
+        HUDController.shared.hide()
     }
 
     /// 面板文件转写入口
