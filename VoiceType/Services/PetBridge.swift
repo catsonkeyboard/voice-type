@@ -48,6 +48,17 @@ enum PetAction: Equatable {
     case ignore
 }
 
+/// 录音启动期间到达的结束或取消请求，启动完成后执行
+enum PendingEnd: Equatable {
+    case finish
+    case cancel
+
+    /// 取消优先：已经取消的会话，之后到达的结束请求不能把它改回去
+    static func merge(_ current: PendingEnd?, _ new: PendingEnd) -> PendingEnd {
+        current == .cancel ? .cancel : new
+    }
+}
+
 /// 桌宠发来的请求
 enum PetRequest: Equatable {
     case dictate(session: String, callback: URL)
@@ -101,7 +112,8 @@ enum PetRequest: Equatable {
     {
         switch self {
         case .dictate(let session, let callback):
-            guard idle, !meetingRecording else {
+            // 录音（含启动中）也算忙：不依赖调用方把 idle 算对
+            guard idle, !recording, !meetingRecording else {
                 return .refuse(session: session, callback: callback, reason: .busy)
             }
             return .start(session: session, callback: callback)

@@ -44,7 +44,30 @@ final class PetBridgeTests: XCTestCase {
         XCTAssertNil(PetRequest.parse(URL(string: "voicetype://record?session=abc123")!))
     }
 
+    func testAcceptsSessionsAtTheLimitsAndInTheUsualShapes() {
+        let sessions = [
+            String(repeating: "a", count: 64),  // 长度上限
+            "A-b-9",  // 大小写字母、连字符、数字
+            "0123456789abcdef0123456789abcdef",  // 桌宠生成的 32 位十六进制
+        ]
+        for session in sessions {
+            XCTAssertEqual(
+                PetRequest.parse(URL(string: "voicetype://stop?session=\(session)")!),
+                .stop(session: session), session)
+        }
+    }
+
+    func testRejectsASessionMadeOfMultiByteCharacters() {
+        // 「你」是 3 个字节：长度在范围内，但不是字母、数字或连字符
+        XCTAssertNil(PetRequest.parse(URL(string: "voicetype://stop?session=%E4%BD%A0")!))
+        XCTAssertNil(PetRequest.parse(URL(string: "voicetype://stop?session=ab%E4%BD%A0cd")!))
+    }
+
     // MARK: - 回传 URL
+
+    func testEncodeLeavesUnreservedCharactersAlone() {
+        XCTAssertEqual(PetCallback.encode("a-b_c.d~e"), "a-b_c.d~e")
+    }
 
     func testCallbackURLEncodesText() {
         let url = PetCallback.url(
@@ -61,6 +84,8 @@ final class PetBridgeTests: XCTestCase {
         let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
         XCTAssertEqual(items.first { $0.name == "text" }?.value, text)
         XCTAssertEqual(items.first { $0.name == "session" }?.value, "abc123")
+        // 接收方若按表单规则解码，裸的 + 会被当成空格：文字里的加号和空格都必须编码
+        XCTAssertFalse(url.absoluteString.contains("+"))
     }
 
     func testCallbackURLCarriesFailures() {
@@ -85,46 +110,72 @@ final class PetBridgeTests: XCTestCase {
 
     // MARK: - 请求该做什么
 
-    func testDictateStartsOnlyWhenIdle() {
+    func testDictateStartsOnlyWhenFullyIdleInAllEightStates() {
         let request = PetRequest.dictate(session: "s1", callback: callback)
-        XCTAssertEqual(
-            request.action(idle: true, recording: false, meetingRecording: false, target: .cursor),
-            .start(session: "s1", callback: callback))
-        // 正在录音、识别或润色：不打断，立刻回传 busy
-        XCTAssertEqual(
-            request.action(idle: false, recording: true, meetingRecording: false, target: .cursor),
-            .refuse(session: "s1", callback: callback, reason: .busy))
-        XCTAssertEqual(
-            request.action(idle: false, recording: false, meetingRecording: false, target: .cursor),
-            .refuse(session: "s1", callback: callback, reason: .busy))
-        // 会议录音进行中
-        XCTAssertEqual(
-            request.action(idle: true, recording: false, meetingRecording: true, target: .cursor),
-            .refuse(session: "s1", callback: callback, reason: .busy))
+        let start = PetAction.start(session: "s1", callback: callback)
+        let busy = PetAction.refuse(session: "s1", callback: callback, reason: .busy)
+        var checked = 0
+        for idle in [false, true] {
+            for recording in [false, true] {
+                for meetingRecording in [false, true] {
+                    // 只有「空闲、没在录音（含启动中）、没有会议录音」这一种状态会开始；
+                    // 其余七种不打断正在进行的事，立刻回传 busy
+                    let expected =
+                        (idle, recording, meetingRecording) == (true, false, false) ? start : busy
+                    XCTAssertEqual(
+                        request.action(
+                            idle: idle, recording: recording, meetingRecording: meetingRecording,
+                            target: .cursor),
+                        expected,
+                        "idle: \(idle), recording: \(recording), meetingRecording: \(meetingRecording)"
+                    )
+                    checked += 1
+                }
+            }
+        }
+        XCTAssertEqual(checked, 8)
     }
 
-    func testStopAndCancelOnlyTouchTheirOwnRecording() {
-        let mine = DictationTarget.pet(session: "s1", callback: callback)
-        XCTAssertEqual(
-            PetRequest.stop(session: "s1").action(
-                idle: false, recording: true, meetingRecording: false, target: mine),
-            .finish)
-        XCTAssertEqual(
-            PetRequest.cancel(session: "s1").action(
-                idle: false, recording: true, meetingRecording: false, target: mine),
-            .cancel)
-        // 别的 session、光标听写、已经不在录音：都不动
-        XCTAssertEqual(
-            PetRequest.stop(session: "s2").action(
-                idle: false, recording: true, meetingRecording: false, target: mine),
-            .ignore)
-        XCTAssertEqual(
-            PetRequest.stop(session: "s1").action(
-                idle: false, recording: true, meetingRecording: false, target: .cursor),
-            .ignore)
-        XCTAssertEqual(
-            PetRequest.cancel(session: "s1").action(
-                idle: false, recording: false, meetingRecording: false, target: mine),
-            .ignore)
+    func testStopAndCancelActOnlyOnTheirOwnRecordingInAllCombinations() {
+        let targets: [(label: String, target: DictationTarget)] = [
+            ("pet s1", .pet(session: "s1", callback: callback)),
+            ("pet s2", .pet(session: "s2", callback: callback)),
+            ("cursor", .cursor),
+        ]
+        let requests: [(label: String, request: PetRequest, effect: PetAction)] = [
+            ("stop", .stop(session: "s1"), .finish),
+            ("cancel", .cancel(session: "s1"), .cancel),
+        ]
+        var checked = 0
+        for (requestLabel, request, effect) in requests {
+            for recording in [false, true] {
+                for (targetLabel, target) in targets {
+                    // 只有「正在录音，且这次听写就是 s1 自己的会话」才动手；
+                    // 别的 session、光标听写、已经不在录音：全部忽略
+                    let expected: PetAction =
+                        (recording, targetLabel) == (true, "pet s1") ? effect : .ignore
+                    XCTAssertEqual(
+                        request.action(
+                            idle: !recording, recording: recording, meetingRecording: false,
+                            target: target),
+                        expected,
+                        "\(requestLabel) s1, recording: \(recording), target: \(targetLabel)")
+                    checked += 1
+                }
+            }
+        }
+        XCTAssertEqual(checked, 12)
+    }
+
+    // MARK: - 启动期间的结束请求
+
+    func testPendingEndMergeLetsACancelWin() {
+        XCTAssertEqual(PendingEnd.merge(nil, .finish), .finish)
+        XCTAssertEqual(PendingEnd.merge(nil, .cancel), .cancel)
+        XCTAssertEqual(PendingEnd.merge(.finish, .cancel), .cancel)
+        // 已经取消的会话，之后到达的结束请求不能把它改回去
+        XCTAssertEqual(PendingEnd.merge(.cancel, .finish), .cancel)
+        XCTAssertEqual(PendingEnd.merge(.finish, .finish), .finish)
+        XCTAssertEqual(PendingEnd.merge(.cancel, .cancel), .cancel)
     }
 }

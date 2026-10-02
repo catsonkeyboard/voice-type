@@ -21,7 +21,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let text = event.paramDescriptor(forKeyword: AEKeyword(keyDirectObject))?.stringValue,
             let url = URL(string: text),
             let request = PetRequest.parse(url)
-        else { return }
+        else {
+            // 只记这一行，不写 URL 的任何部分
+            NSLog("VoiceType: 忽略了一个无法识别的 voicetype:// 请求")
+            return
+        }
         Task { @MainActor in
             AppDependencies.shared.dictation.handle(request)
         }

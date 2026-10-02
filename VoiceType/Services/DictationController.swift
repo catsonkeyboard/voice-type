@@ -24,11 +24,6 @@ final class DictationController {
     /// 启动期间桌宠已经要求结束或取消：启动完成后立刻执行
     private var pendingEnd: PendingEnd?
 
-    private enum PendingEnd {
-        case finish
-        case cancel
-    }
-
     init(state: AppState, asr: AsrService, history: HistoryStore, polish: PolishService) {
         self.state = state
         self.asr = asr
@@ -73,13 +68,13 @@ final class DictationController {
             startRecording(target: .pet(session: session, callback: callback))
         case .finish:
             if starting {
-                pendingEnd = .finish
+                pendingEnd = PendingEnd.merge(pendingEnd, .finish)
             } else {
                 Task { await finishRecording() }
             }
         case .cancel:
             if starting {
-                pendingEnd = .cancel
+                pendingEnd = PendingEnd.merge(pendingEnd, .cancel)
             } else {
                 cancelRecording()
             }
@@ -161,9 +156,10 @@ final class DictationController {
         }
     }
 
-    /// 录音没能开始：若由桌宠发起，把原因回传；去向复位
+    /// 录音没能开始：若由桌宠发起，把原因回传；去向复位。
+    /// 启动期间桌宠已经取消了这次会话时不回传：取消从不回传。
     private func failStart(_ reason: PetFailure) {
-        reply(target, .failure(reason))
+        if pendingEnd != .cancel { reply(target, .failure(reason)) }
         target = .cursor
         pendingEnd = nil
     }
