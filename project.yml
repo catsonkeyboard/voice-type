@@ -32,6 +32,10 @@ targets:
         CFBundleDisplayName: VoiceType
         LSUIElement: true
         NSMicrophoneUsageDescription: VoiceType 需要访问麦克风进行语音转写。
+        CFBundleURLTypes:
+          - CFBundleURLName: com.catsonkeyboard.VoiceType
+            CFBundleURLSchemes:
+              - voicetype
   VoiceTypeTests:
     type: bundle.unit-test
     platform: macOS
