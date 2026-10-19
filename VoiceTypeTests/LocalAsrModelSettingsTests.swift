@@ -29,6 +29,20 @@ final class LocalAsrModelSettingsTests: XCTestCase {
         XCTAssertEqual(SettingsStore.localAsrModel, .funasrNano, "未知档位回退默认而非崩溃")
     }
 
+    func testFireRedCtcRawValueAndMetadata() {
+        XCTAssertEqual(LocalAsrModel.fireRedCtc.rawValue, "fireRedCtc")
+        XCTAssertTrue(LocalAsrModel.fireRedCtc.label.contains("FireRedASR2-CTC"))
+        XCTAssertTrue(LocalAsrModel.fireRedCtc.note.contains("实验"))
+        XCTAssertEqual(
+            LocalAsrModel.fireRedCtc.installCommand,
+            "./scripts/download_models.sh fire-red-ctc")
+    }
+
+    func testRoundTripFireRedCtc() {
+        SettingsStore.localAsrModel = .fireRedCtc
+        XCTAssertEqual(SettingsStore.localAsrModel, .fireRedCtc)
+    }
+
     func testAllPresentReflectsSelectedModel() {
         // 三个已知档位：allPresent 必须跟随选择，而非固定检测某一个文件
         let anyInstalled = LocalAsrModel.allCases.contains { ModelPaths.isPresent($0) }

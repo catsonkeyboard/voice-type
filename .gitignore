@@ -4,6 +4,8 @@ dist/
 DerivedData/
 Vendor/
 *.xcodeproj
+# 本地基准测试音频（用户自录，不入库）
+benchmark_samples/
 
 # Windows (.NET / WPF)
 windows/src/*/bin/

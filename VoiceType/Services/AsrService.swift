@@ -54,6 +54,14 @@ enum ModelPaths {
         qwen3Dir.appendingPathComponent("tokenizer", isDirectory: true)
     }
 
+    // MARK: - FireRedASR2-CTC（models/fire-red-ctc/，v7 实验档）
+
+    static var fireRedDir: URL {
+        modelsDir.appendingPathComponent("fire-red-ctc", isDirectory: true)
+    }
+    static var fireRedModel: URL { fireRedDir.appendingPathComponent("model.int8.onnx") }
+    static var fireRedTokens: URL { fireRedDir.appendingPathComponent("tokens.txt") }
+
     // MARK: - 公共组件
 
     static var vadModel: URL { modelsDir.appendingPathComponent("silero_vad.onnx") }
@@ -90,6 +98,8 @@ enum ModelPaths {
                 && ["vocab.json", "merges.txt", "tokenizer_config.json"].allSatisfy {
                     exists(qwen3Tokenizer.appendingPathComponent($0))
                 }
+        case .fireRedCtc:
+            return exists(fireRedModel) && exists(fireRedTokens)
         }
     }
 
@@ -111,7 +121,7 @@ final class AsrService: @unchecked Sendable {
     private static func isLLM(_ model: LocalAsrModel) -> Bool {
         switch model {
         case .funasrNano, .qwen3Asr: return true
-        case .senseVoice: return false
+        case .senseVoice, .fireRedCtc: return false
         }
     }
 
@@ -167,6 +177,13 @@ final class AsrService: @unchecked Sendable {
                     decoder: ModelPaths.qwen3Decoder.path,
                     tokenizer: ModelPaths.qwen3Tokenizer.path,
                     maxNewTokens: 512
+                ))
+        case .fireRedCtc:
+            modelConfig = sherpaOnnxOfflineModelConfig(
+                tokens: ModelPaths.fireRedTokens.path,
+                numThreads: 4,
+                fireRedAsrCtc: sherpaOnnxOfflineFireRedAsrCtcModelConfig(
+                    model: ModelPaths.fireRedModel.path
                 ))
         }
         var config = sherpaOnnxOfflineRecognizerConfig(

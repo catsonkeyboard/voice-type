@@ -17,6 +17,7 @@ enum LocalAsrModel: String, Codable, CaseIterable, Identifiable {
     case funasrNano
     case qwen3Asr
     case senseVoice
+    case fireRedCtc
 
     var id: String { rawValue }
 
@@ -25,6 +26,7 @@ enum LocalAsrModel: String, Codable, CaseIterable, Identifiable {
         case .funasrNano: return "Fun-ASR-Nano-2512"
         case .qwen3Asr: return "Qwen3-ASR-0.6B"
         case .senseVoice: return "SenseVoiceSmall"
+        case .fireRedCtc: return "FireRedASR2-CTC（实验）"
         }
     }
 
@@ -37,6 +39,8 @@ enum LocalAsrModel: String, Codable, CaseIterable, Identifiable {
             return "30 语种 + 22 中文方言（0.6B，约 950MB）"
         case .senseVoice:
             return "轻量极速，纯中文/英文较好，混杂较弱（约 230MB）"
+        case .fireRedCtc:
+            return "中英混合 + 20 余种方言，CTC 解码 CPU 快（约 1.7GB，实验）"
         }
     }
 
@@ -46,6 +50,7 @@ enum LocalAsrModel: String, Codable, CaseIterable, Identifiable {
         case .funasrNano: return "./scripts/download_models.sh funasr-nano"
         case .qwen3Asr: return "./scripts/download_models.sh qwen3"
         case .senseVoice: return "./scripts/export_model.sh"
+        case .fireRedCtc: return "./scripts/download_models.sh fire-red-ctc"
         }
     }
 }
