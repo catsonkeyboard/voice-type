@@ -244,7 +244,7 @@ final class DictationController {
                 text = try await asr.transcribe(samples: samples)
             }
             // 热词纠正在后台执行（拼音转换+编辑距离开销与文本长度成正比）
-            let hotwords = SettingsStore.hotwords
+            let hotwords = DevGlossary.merged(withUser: SettingsStore.hotwords)
             text = await Task.detached(priority: .userInitiated) {
                 HotwordCorrector(hotwords: hotwords).correct(text)
             }.value
@@ -343,7 +343,7 @@ final class DictationController {
                 if text.isEmpty {
                     state.fileJob = .failed("未识别到语音内容")
                 } else {
-                    let hotwords = SettingsStore.hotwords
+                    let hotwords = DevGlossary.merged(withUser: SettingsStore.hotwords)
                     let corrected = await Task.detached(priority: .userInitiated) {
                         HotwordCorrector(hotwords: hotwords).correct(text)
                     }.value

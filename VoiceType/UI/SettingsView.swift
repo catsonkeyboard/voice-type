@@ -364,7 +364,7 @@ private struct HotwordSettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("每行一个热词（人名、品牌、专业术语等，仅支持中文词）。识别后按拼音相似度自动纠正。")
+            Text("每行一个热词（人名、品牌、专业术语；支持中英混合，可用「目标|别名」纠正音译，如 Kubernetes|库伯内提斯）。已内置常见开发术语，无需重复添加。识别后按拼音/拼写相似度自动纠正。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             TextEditor(text: $text)
@@ -376,7 +376,7 @@ private struct HotwordSettingsView: View {
                 .onChange(of: text) { _, newValue in
                     SettingsStore.hotwordsText = newValue
                 }
-            Text("当前生效 \(SettingsStore.hotwords.count) 个热词")
+            Text("当前生效 \(SettingsStore.hotwords.count) 个热词（另内置 \(DevGlossary.terms.count) 个开发术语）")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
