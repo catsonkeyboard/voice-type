@@ -6,17 +6,19 @@ macOS 菜单栏语音转写工具，同时提供 **Windows 版**（WPF/.NET，�
 
 ## 功能
 
-- **本地模型三档可选（v5）**：设置 → 识别 → 本地模型
+- **本地模型四档可选（v5/v7）**：设置 → 识别 → 本地模型
   - **Fun-ASR-Nano-2512**（默认，0.8B int8 约 1GB）：中英混杂（code-switching）与中文方言最强，LLM 解码器带上下文理解与幻觉抑制
   - **Qwen3-ASR-0.6B**（约 950MB）：30 语种 + 22 中文方言，支持歌词/说唱
   - **SenseVoiceSmall**（约 230MB）：轻量极速，延迟最低，纯中文/英文场景够用
+  - **FireRedASR2-CTC**（约 1.7GB，实验）：中英混合 + 20 余种方言，CTC 解码 CPU 快。实验档——基准测试（`VoiceTypeTests/AsrBenchmarkTests`）跑赢默认档前不作推荐
   - 切换即时生效；LLM 型模型单段超 20s 自动 VAD 分段，规避 max_total_len 截断
 - **智能润色（v2）**：本地 LLM（Ollama + MLX）把口语碎片转为书面语——过滤"呃/嗯/那个"等口头禅、识别自我纠正（"明天下午…不对，上午九点" → "明天上午九点"）、自动把列举内容排成列表；润色不可用时自动降级输出原始转写
 - **云端识别（v3，可选）**：可切换到阿里云百炼 Fun-ASR-Realtime 流式识别——说话时 HUD 实时显示中间结果，停止后终稿几乎立即产出；任何失败自动回退本地引擎。API Key 存 macOS 钥匙串。注意：云端模式音频会发送至阿里云
 - **会议转写与说话人分离（v4）**：面板一键录制会议（或导入录音文件），纯本地区分说话人并分段转写（sherpa-onnx pyannote 分段 + 3D-Speaker 声纹）；结果窗口支持说话人改名、导出 Markdown、LLM 生成会议纪要（主题/要点/决议/待办）。首次使用运行 `scripts/setup_diarization.sh` 下载分离模型（约 35MB）
 - 全局快捷键听写到光标（toggle：按一下开始，再按结束），自带标点与数字归一化
 - 状态栏面板：手动录音、转写历史（复制/删除）、音频文件拖拽转写（VAD 自动分段）
-- 热词词表：拼音模糊匹配纠正专有名词
+- **热词纠正（v7）**：自定义词表，识别后自动纠正。条目支持纯中文（拼音模糊）、中英混合（拼写模糊 + 规范大小写归位，如 `kubernets` → `Kubernetes`）、别名语法「目标|别名」纠正音译（如 `Kubernetes|库伯内提斯`）；内置约 130 个常见开发术语，无需手工录入
+- **润色保护英文术语（v7）**：润色提示词带铁律——英文单词、缩写与技术术语原样保留，禁止翻译、改写、变大小写，中英混说语序不打乱
 - 开机自启、快捷键自定义、录音悬浮 HUD
 
 ## 构建
@@ -24,7 +26,7 @@ macOS 菜单栏语音转写工具，同时提供 **Windows 版**（WPF/.NET，�
 前置：Xcode 15+、`brew install xcodegen`、`uv`
 
     ./scripts/export_model.sh          # 一次性：导出 SenseVoiceSmall + 下载 VAD（装到 ~/Library/Application Support/VoiceType/models/）
-    ./scripts/download_models.sh funasr-nano   # 默认模型（约 1GB）；或 qwen3 / all
+    ./scripts/download_models.sh funasr-nano   # 默认模型（约 1GB）；或 qwen3 / fire-red-ctc / all
     ./scripts/setup_diarization.sh     # 可选：会议说话人分离模型（约 35MB）
     ./scripts/build.sh                 # 产出 dist/VoiceType.app
     cp -R dist/VoiceType.app /Applications/

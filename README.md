@@ -12,13 +12,15 @@ Press a global hotkey (default `⌥Space`) anywhere, speak naturally, and the tr
   - **Fun-ASR-Nano-2512** (default, 0.8B int8, ~1GB): strongest Chinese-English code-switching and Chinese dialects; LLM decoder with context understanding and hallucination suppression
   - **Qwen3-ASR-0.6B** (~950MB): 30 languages + 22 Chinese dialects, song lyrics / rap recognition
   - **SenseVoiceSmall** (~230MB): lightweight and fastest, good for pure Chinese or English
+  - **FireRedASR2-CTC** (~1.7GB, experimental): Chinese-English mixed + 20+ Chinese dialects, fast CTC decoding on CPU. Experimental — kept off the default recommendation until it beats the defaults on the ASR benchmark (`VoiceTypeTests/AsrBenchmarkTests`)
   - Switching takes effect immediately; LLM models auto-segment dictations longer than 20s via VAD to avoid the max_total_len truncation
 - **Smart polishing (v2)**: a local LLM (Ollama + Apple MLX backend) rewrites spoken fragments into fluent written text — removes filler words ("um", "uh", 呃/嗯/那个), applies self-corrections, and auto-formats enumerations into Markdown lists. Falls back to the raw transcript automatically whenever the LLM is unavailable — dictation is never blocked
 - **Cloud ASR (v3, optional)**: switch to Alibaba Cloud Model Studio's Fun-ASR-Realtime for streaming recognition — live partial results in the HUD while you speak, near-instant final text on stop, automatic fallback to the local engine on any failure. API key stored in the macOS Keychain. Note: cloud mode sends audio to Alibaba Cloud
 - **Meeting transcription with speaker diarization (v4)**: record a meeting from the mic (or import an audio file) and get a speaker-labeled transcript — pyannote segmentation + 3D-Speaker embeddings via sherpa-onnx, fully on-device. Rename speakers, export Markdown, and generate AI meeting minutes (topics / key points / decisions / action items) through your configured LLM
 - **Hotkey dictation to cursor**: press once to start, again to stop; recognized text is injected at the cursor of whatever app you're in. Built-in punctuation and inverse text normalization
 - **Menu bar panel**: manual recording, transcription history (copy / delete, polished + raw text kept), drag-and-drop audio file transcription with VAD segmentation
-- **Hotword correction**: maintain a custom vocabulary; recognized text is corrected by pinyin fuzzy matching (great for names and domain terms)
+- **Hotword correction (v7)**: maintain a custom vocabulary; recognized text is corrected by pinyin fuzzy matching (great for names and domain terms). Entries support pure Chinese, English/mixed terms (spelling fuzzy match + canonical casing, e.g. `kubernets` → `Kubernetes`), and an alias syntax `Target|Alias` for transliteration fixes (e.g. `Kubernetes|库伯内提斯`). ~130 common dev terms (Kubernetes, GraphQL, CI/CD, …) are built in
+- **Polishing preserves English terms (v7)**: the polish prompt has a hard rule to keep English words, abbreviations and technical terms verbatim — no translation, no respelling, no case changes; code-switching word order is preserved
 - Launch at login, customizable hotkey, recording HUD
 
 ## Performance
@@ -30,7 +32,7 @@ On Apple Silicon: recognition is fully local via sherpa-onnx — SenseVoiceSmall
 Prerequisites: Xcode 15+, `brew install xcodegen`
 
     ./scripts/export_model.sh                 # one-time: export SenseVoiceSmall + download the VAD model
-    ./scripts/download_models.sh funasr-nano  # default model (~1GB); or qwen3 / all
+    ./scripts/download_models.sh funasr-nano  # default model (~1GB); or qwen3 / fire-red-ctc / all
     ./scripts/setup_diarization.sh            # optional: speaker diarization models (~35MB)
     ./scripts/build.sh                        # produces dist/VoiceType.app
     cp -R dist/VoiceType.app /Applications/
