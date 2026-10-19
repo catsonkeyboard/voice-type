@@ -57,4 +57,53 @@ final class HotwordCorrectorTests: XCTestCase {
         let corrector = HotwordCorrector(hotwords: ["朗诗德"])
         XCTAssertEqual(corrector.correct("朗诗德净水器很好"), "朗诗德净水器很好")
     }
+
+    // MARK: - v7 中英混合与别名（latin 模糊匹配 + alias 语法）
+
+    func testLatinExactMatch() {
+        let corrector = HotwordCorrector(hotwords: ["Kubernetes"])
+        XCTAssertEqual(corrector.correct("kubernetes 集群"), "Kubernetes 集群")
+    }
+
+    func testLatinFuzzyMatch() {
+        // kubernets → kubernetes：编辑距离 1，长度 10 容差 2
+        let corrector = HotwordCorrector(hotwords: ["Kubernetes"])
+        XCTAssertEqual(corrector.correct("kubernets 集群"), "Kubernetes 集群")
+    }
+
+    func testShortLatinOnlyExact() {
+        // 短词（<6 字符）禁模糊：API 不应误伤 apiary
+        let corrector = HotwordCorrector(hotwords: ["API"])
+        XCTAssertEqual(corrector.correct("apiary 文档"), "apiary 文档")
+        XCTAssertEqual(corrector.correct("api 网关"), "API 网关")
+    }
+
+    func testLatinWithSeparators() {
+        let corrector = HotwordCorrector(hotwords: ["CI/CD", "Next.js"])
+        XCTAssertEqual(corrector.correct("ci/cd 流水线"), "CI/CD 流水线")
+        XCTAssertEqual(corrector.correct("next.js 项目"), "Next.js 项目")
+    }
+
+    func testAliasCJK() {
+        // 别名条目：识别出拼音近似「库伯内提斯」时替换为 Kubernetes
+        let corrector = HotwordCorrector(hotwords: ["Kubernetes|库伯内提斯"])
+        XCTAssertEqual(corrector.correct("部署到库伯内提斯"), "部署到 Kubernetes")
+    }
+
+    func testAliasLatin() {
+        let corrector = HotwordCorrector(hotwords: ["PostgreSQL|postgres"])
+        XCTAssertEqual(corrector.correct("连 postgres 数据库"), "连 PostgreSQL 数据库")
+    }
+
+    func testMixedEntry() {
+        // 混合条目（拉丁+CJK）：滑窗按 CJK 段拼音纠正 + 拉丁段模糊纠正
+        let corrector = HotwordCorrector(hotwords: ["Vue 组件"])
+        XCTAssertEqual(corrector.correct("vue组建渲染失败"), "Vue 组件渲染失败")
+    }
+
+    func testLatinNotTouchUnrelated() {
+        // 目标词内的分隔符是词条一部分；独立单词 "graph ql"（带空格）不匹配 "GraphQL"
+        let corrector = HotwordCorrector(hotwords: ["GraphQL"])
+        XCTAssertEqual(corrector.correct("graph ql 笔记"), "graph ql 笔记")
+    }
 }
