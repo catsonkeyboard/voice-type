@@ -177,7 +177,7 @@ public sealed class DictationController
                     cloudDegraded = true;
                 text = await _asr.TranscribeAsync(samples);
             }
-            text = new HotwordCorrector(_settings.Hotwords).Correct(text);
+            text = new HotwordCorrector(DevGlossary.MergedWithUser(_settings.Hotwords)).Correct(text);
             if (text.Length == 0)
             {
                 _state.Phase = AppState.PhaseKind.Idle;
@@ -260,7 +260,7 @@ public sealed class DictationController
             }
             else
             {
-                string corrected = new HotwordCorrector(_settings.Hotwords).Correct(text);
+                string corrected = new HotwordCorrector(DevGlossary.MergedWithUser(_settings.Hotwords)).Correct(text);
                 _history.Add(corrected, 0, "file");
                 _state.FileJob = AppState.FileJobKind.Done;
                 _state.FileJobText = corrected;

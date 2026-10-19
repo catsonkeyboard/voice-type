@@ -71,6 +71,12 @@ internal sealed class OfflineRecognizer : IDisposable
                     seed = 42,
                 };
                 break;
+            case OfflineModelKind.FireRedAsrCtc:
+                model.fire_red_asr_ctc = new SherpaOnnxNative.OfflineFireRedAsrCtcModelConfig
+                {
+                    model = pool.Alloc(o.FireRedAsrCtc!.Model),
+                };
+                break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(o.ModelKind));
         }
@@ -137,6 +143,7 @@ internal enum OfflineModelKind
     SenseVoice,
     FunAsrNano,
     Qwen3Asr,
+    FireRedAsrCtc,
 }
 
 internal sealed class OfflineRecognizerOptions
@@ -147,6 +154,7 @@ internal sealed class OfflineRecognizerOptions
     public SenseVoiceOptions? SenseVoice { get; init; }
     public FunAsrNanoOptions? FunAsrNano { get; init; }
     public Qwen3AsrOptions? Qwen3Asr { get; init; }
+    public FireRedAsrCtcOptions? FireRedAsrCtc { get; init; }
 }
 
 internal sealed class SenseVoiceOptions
@@ -174,4 +182,10 @@ internal sealed class Qwen3AsrOptions
     /// <summary>tokenizer 目录（vocab.json / merges.txt / tokenizer_config.json）</summary>
     public string TokenizerDir { get; init; } = "";
     public int MaxNewTokens { get; init; } = 512;
+}
+
+/// <summary>FireRedASR2-CTC（v7 实验档）：单模型文件 + tokens。</summary>
+internal sealed class FireRedAsrCtcOptions
+{
+    public string Model { get; init; } = "";
 }

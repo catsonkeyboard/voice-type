@@ -76,6 +76,76 @@ public class HotwordCorrectorTests
         Assert.Equal("朗诗德净水器很好", corrector.Correct("朗诗德净水器很好"));
     }
 
+    // ----- v7 中英混合与别名（与 macOS 用例对齐）-----
+
+    private static readonly Dictionary<char, string> MixedMap = new(Map)
+    {
+        ['库'] = "ku", ['伯'] = "bo", ['内'] = "nei", ['提'] = "ti", ['斯'] = "si",
+        ['组'] = "zu", ['建'] = "jian",
+    };
+
+    private static HotwordCorrector MixedCorrector(params string[] hotwords) =>
+        new(hotwords, new FakePinyin(MixedMap));
+
+    [Fact]
+    public void Latin_ExactMatch()
+    {
+        var corrector = Corrector("Kubernetes");
+        Assert.Equal("Kubernetes 集群", corrector.Correct("kubernetes 集群"));
+    }
+
+    [Fact]
+    public void Latin_FuzzyMatch()
+    {
+        var corrector = Corrector("Kubernetes");
+        Assert.Equal("Kubernetes 集群", corrector.Correct("kubernets 集群"));
+    }
+
+    [Fact]
+    public void Latin_ShortOnlyExact()
+    {
+        var corrector = Corrector("API");
+        Assert.Equal("apiary 文档", corrector.Correct("apiary 文档"));
+        Assert.Equal("API 网关", corrector.Correct("api 网关"));
+    }
+
+    [Fact]
+    public void Latin_WithSeparators()
+    {
+        var corrector = Corrector("CI/CD", "Next.js");
+        Assert.Equal("CI/CD 流水线", corrector.Correct("ci/cd 流水线"));
+        Assert.Equal("Next.js 项目", corrector.Correct("next.js 项目"));
+    }
+
+    [Fact]
+    public void Alias_Cjk()
+    {
+        var corrector = MixedCorrector("Kubernetes|库伯内提斯");
+        Assert.Equal("部署到 Kubernetes", corrector.Correct("部署到库伯内提斯"));
+    }
+
+    [Fact]
+    public void Alias_Latin()
+    {
+        var corrector = Corrector("PostgreSQL|postgres");
+        Assert.Equal("连 PostgreSQL 数据库", corrector.Correct("连 postgres 数据库"));
+    }
+
+    [Fact]
+    public void MixedEntry_Vue_Component()
+    {
+        var corrector = MixedCorrector("Vue 组件");
+        Assert.Equal("Vue 组件渲染失败", corrector.Correct("vue组建渲染失败"));
+    }
+
+    [Fact]
+    public void Latin_PrefixNotReplaced()
+    {
+        // 「graph」是「graphql」的前缀（ASR 拆词特征），不替换
+        var corrector = Corrector("GraphQL");
+        Assert.Equal("graph ql 笔记", corrector.Correct("graph ql 笔记"));
+    }
+
     // ----- Levenshtein -----
 
     [Fact]

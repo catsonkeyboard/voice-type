@@ -34,6 +34,12 @@ public static class ModelPaths
     /// <summary>tokenizer 目录（vocab.json / merges.txt / tokenizer_config.json，无 tokenizer.json）</summary>
     public static string Qwen3Tokenizer => Path.Combine(Qwen3Dir, "tokenizer");
 
+    // ----- FireRedASR2-CTC（models/fire-red-ctc/，v7 实验档）-----
+
+    public static string FireRedDir => Path.Combine(ModelsDir, "fire-red-ctc");
+    public static string FireRedModel => Path.Combine(FireRedDir, "model.int8.onnx");
+    public static string FireRedTokens => Path.Combine(FireRedDir, "tokens.txt");
+
     // ----- 公共组件 -----
 
     public static string VadModel => Path.Combine(ModelsDir, "silero_vad.onnx");
@@ -57,6 +63,7 @@ public static class ModelPaths
             File.Exists(Qwen3ConvFrontend) && File.Exists(Qwen3Encoder) && File.Exists(Qwen3Decoder)
             && new[] { "vocab.json", "merges.txt", "tokenizer_config.json" }
                 .All(f => File.Exists(Path.Combine(Qwen3Tokenizer, f))),
+        LocalAsrModel.FireRedCtc => File.Exists(FireRedModel) && File.Exists(FireRedTokens),
         _ => false,
     };
 }

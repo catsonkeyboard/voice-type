@@ -31,9 +31,7 @@ public sealed class AsrService : IDisposable
     private SettingsStore Settings => _settings();
 
     private static bool IsLlm(LocalAsrModel model) =>
-        model is LocalAsrModel.FunasrNano or LocalAsrModel.Qwen3Asr;
-
-    /// <summary>预热：后台加载当前档位模型（App 启动时调用）</summary>
+        model is LocalAsrModel.FunasrNano or LocalAsrModel.Qwen3Asr;    /// <summary>预热：后台加载当前档位模型（App 启动时调用）</summary>
     public void WarmUp() => _ = Task.Run(async () =>
     {
         await _gate.WaitAsync();
@@ -75,10 +73,18 @@ public sealed class AsrService : IDisposable
                 LocalAsrModel.SenseVoice => OfflineModelKind.SenseVoice,
                 LocalAsrModel.FunasrNano => OfflineModelKind.FunAsrNano,
                 LocalAsrModel.Qwen3Asr => OfflineModelKind.Qwen3Asr,
+                LocalAsrModel.FireRedCtc => OfflineModelKind.FireRedAsrCtc,
                 _ => throw new ArgumentOutOfRangeException(),
             },
             NumThreads = 4,
-            Tokens = ModelPaths.Tokens,
+            // FireRedASR2-CTC 用自己的 tokens.txt；SenseVoice 用根目录历史布局；
+            // LLM 型模型（FunAsrNano/Qwen3Asr）走 tokenizer 目录，tokens 传空
+            Tokens = model switch
+            {
+                LocalAsrModel.SenseVoice => ModelPaths.Tokens,
+                LocalAsrModel.FireRedCtc => ModelPaths.FireRedTokens,
+                _ => "",
+            },
             SenseVoice = new SenseVoiceOptions
             {
                 Model = ModelPaths.AsrModel,
@@ -100,6 +106,10 @@ public sealed class AsrService : IDisposable
                 Decoder = ModelPaths.Qwen3Decoder,
                 TokenizerDir = ModelPaths.Qwen3Tokenizer,
                 MaxNewTokens = 512,
+            },
+            FireRedAsrCtc = new FireRedAsrCtcOptions
+            {
+                Model = ModelPaths.FireRedModel,
             },
         };
         var r = OfflineRecognizer.Create(options);

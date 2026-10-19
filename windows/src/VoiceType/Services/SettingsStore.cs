@@ -28,6 +28,7 @@ public enum LocalAsrModel
     FunasrNano,
     Qwen3Asr,
     SenseVoice,
+    FireRedCtc,
 }
 
 public static class LocalAsrModelExtensions
@@ -37,6 +38,7 @@ public static class LocalAsrModelExtensions
         LocalAsrModel.FunasrNano => "Fun-ASR-Nano-2512",
         LocalAsrModel.Qwen3Asr => "Qwen3-ASR-0.6B",
         LocalAsrModel.SenseVoice => "SenseVoiceSmall",
+        LocalAsrModel.FireRedCtc => "FireRedASR2-CTC（实验）",
         _ => m.ToString(),
     };
 
@@ -46,6 +48,7 @@ public static class LocalAsrModelExtensions
         LocalAsrModel.FunasrNano => "默认 · 中英混杂与方言最强（0.8B，约 1GB，速度稍慢）",
         LocalAsrModel.Qwen3Asr => "30 语种 + 22 中文方言（0.6B，约 950MB）",
         LocalAsrModel.SenseVoice => "轻量极速，纯中文/英文较好，混杂较弱（约 230MB）",
+        LocalAsrModel.FireRedCtc => "中英混合 + 20 余种方言，CTC 解码 CPU 快（约 1.7GB，实验）",
         _ => "",
     };
 
@@ -55,6 +58,7 @@ public static class LocalAsrModelExtensions
         LocalAsrModel.FunasrNano => @".\windows\scripts\download_models.ps1 funasr-nano",
         LocalAsrModel.Qwen3Asr => @".\windows\scripts\download_models.ps1 qwen3",
         LocalAsrModel.SenseVoice => @".\windows\scripts\export_sensevoice.ps1",
+        LocalAsrModel.FireRedCtc => @".\windows\scripts\download_models.ps1 fire-red-ctc",
         _ => "",
     };
 }

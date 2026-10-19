@@ -177,7 +177,7 @@
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                <TextBlock Text="每行一个热词（人名、品牌、专业术语等，仅支持中文词）。识别后按拼音相似度自动纠正。"
+                <TextBlock Text="每行一个热词（人名、品牌、专业术语；支持中英混合，可用「目标|别名」纠正音译，如 Kubernetes|库伯内提斯）。已内置常见开发术语，无需重复添加。识别后按拼音/拼写相似度自动纠正。"
                            FontSize="11" Foreground="#8B949E" TextWrapping="Wrap"/>
                 <TextBox x:Name="HotwordsBox" Grid.Row="1" AcceptsReturn="True"
                          TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"

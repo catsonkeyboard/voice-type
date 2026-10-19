@@ -95,6 +95,8 @@ public class LocalAsrModelTests
         Assert.Equal("Fun-ASR-Nano-2512", LocalAsrModel.FunasrNano.Label());
         Assert.Equal("Qwen3-ASR-0.6B", LocalAsrModel.Qwen3Asr.Label());
         Assert.Equal("SenseVoiceSmall", LocalAsrModel.SenseVoice.Label());
+        Assert.Contains("FireRedASR2-CTC", LocalAsrModel.FireRedCtc.Label());
+        Assert.Contains("实验", LocalAsrModel.FireRedCtc.Note());
     }
 
     [Fact]
@@ -103,6 +105,7 @@ public class LocalAsrModelTests
         Assert.EndsWith(".ps1 funasr-nano", LocalAsrModel.FunasrNano.InstallCommand());
         Assert.EndsWith(".ps1 qwen3", LocalAsrModel.Qwen3Asr.InstallCommand());
         Assert.EndsWith("export_sensevoice.ps1", LocalAsrModel.SenseVoice.InstallCommand());
+        Assert.EndsWith(".ps1 fire-red-ctc", LocalAsrModel.FireRedCtc.InstallCommand());
     }
 
     [Fact]
