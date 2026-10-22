@@ -2,7 +2,7 @@
 
 - 日期：2026-10-19
 - 状态：待用户审阅
-- 前置：v5 本地三档模型、v6 桌宠桥接已交付，见同目录既有 spec
+- 前置：v5 本地三档模型、v6 第三方应用联动已交付，见同目录既有 spec
 - 背景：22 款竞品调研（重点：Azex Speech / VoxFlow / LocalScribe / Ottex / OpenTypeless）
 
 ## 1. 背景与结论

@@ -6,7 +6,7 @@ final class TranscriptRecord {
     var text: String
     var createdAt: Date
     var durationSeconds: Double
-    var source: String  // "dictation" | "file" | "pet"
+    var source: String  // "dictation" | "file" | "external"（第三方应用发起）
     var rawText: String?  // 润色前原始转写；未润色为 nil
 
     init(

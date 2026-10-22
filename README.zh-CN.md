@@ -52,23 +52,27 @@ Windows 版位于 [`windows/`](windows/)——WPF / .NET 10 / x64，与 macOS �
 
 默认配置即用（`http://localhost:11434/v1`）。设置 → 润色 可关闭功能、切换"智能清理/完全书面化"风格、更换模型或指向任何 OpenAI 兼容服务（如 LM Studio、云端 API）。历史记录保留润色前原文（右键 → 复制原始转写）。设置内置服务商预设（本地 Ollama / 阿里百炼 / DeepSeek / OpenAI），一键填充地址与推荐模型。
 
-## 桌宠联动（v6）
+## 第三方应用联动（v6）
 
-桌宠 Pet 可以通过 URL scheme 让 VoiceType 录音识别，结果回传给桌宠，不粘贴到光标处：
+其他应用可以通过 URL scheme 让 VoiceType 录音识别，结果回传到请求方自己的回调地址，不粘贴到光标处：
 
-    voicetype://dictate?session=<id>&callback=pet%3A%2F%2Ftranscript   # 开始录音
-    voicetype://stop?session=<id>                                       # 结束并识别
-    voicetype://cancel?session=<id>                                     # 丢弃这次录音
+    voicetype://dictate?session=<id>&callback=<URL 编码的回调地址>   # 开始录音
+    voicetype://stop?session=<id>                                     # 结束并识别
+    voicetype://cancel?session=<id>                                   # 丢弃这次录音
 
-    pet://transcript?session=<id>&text=<文字>     # 回传：识别成功
-    pet://transcript?session=<id>&error=<原因>    # 回传：empty / mic_denied / not_ready / busy / failed
+    <回调地址>?session=<id>&text=<文字>     # 识别成功
+    <回调地址>?session=<id>&error=<原因>    # empty / mic_denied / not_ready / busy / not_allowed / failed
 
-- 回调只接受 `pet://transcript`，其他地址一律拒绝
-- 这类听写不写剪贴板、不模拟 ⌘V；热词纠正与润色照常，历史记录里来源为 `pet`
+例如注册了 `myapp://` scheme 的应用传 `callback=myapp%3A%2F%2Fvoicetype-result`，就会收到 `myapp://voicetype-result?session=…&text=…`。
+
+- **用户授权**：某个回调地址第一次使用时，VoiceType 弹窗显示接收方应用的名称和图标，由用户允许或拒绝，选择会被记住；可在 设置 → 通用 → 第三方应用 中查看和移除。被拒绝的应用收到 `not_allowed`
+- **回调地址要求**：自定义 scheme（不能是 `http`、`https`、`file`、`mailto`、`sms`、`tel` 等，避免文字被送进浏览器或系统应用），不带查询、片段和用户信息，不超过 256 字节；其他地址的请求直接忽略
+- `session` 由请求方生成，1–64 个字母、数字或连字符；回传文字中字母、数字和 `-._~` 以外的字节全部百分号编码
+- 这类听写不写剪贴板、不模拟 ⌘V；热词纠正与润色照常，历史记录里来源为 `external`
 - 录音 HUD 照常显示；VoiceType 自己的快捷键听写不受影响
-- VoiceType 正忙（录音、识别、润色或会议录音中）时回传 `busy`，不打断正在进行的事
+- VoiceType 正忙（录音、识别、润色、会议录音或正在显示授权弹窗）时回传 `busy`，不打断正在进行的事
 
-设计见 `docs/superpowers/specs/2026-10-02-voice-type-v6-pet-bridge-design.md`。
+设计见 `docs/superpowers/specs/2026-10-02-voice-type-v6-app-bridge-design.md`。
 
 ## 首次运行授权
 

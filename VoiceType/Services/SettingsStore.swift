@@ -82,6 +82,31 @@ enum SettingsStore {
         }
     }
 
+    // MARK: - 第三方应用联动（v6）
+
+    /// 回调地址 → 是否允许（true 允许 / false 拒绝）；没有记录即还没问过用户
+    static var bridgePermissions: [String: Bool] {
+        get { defaults.dictionary(forKey: "bridgePermissions") as? [String: Bool] ?? [:] }
+        set { defaults.set(newValue, forKey: "bridgePermissions") }
+    }
+
+    static func bridgePermission(for callback: URL) -> BridgePermission {
+        switch bridgePermissions[callback.absoluteString] {
+        case true?: return .allowed
+        case false?: return .denied
+        case nil: return .unknown
+        }
+    }
+
+    static func setBridgePermission(_ allowed: Bool, for callback: URL) {
+        bridgePermissions[callback.absoluteString] = allowed
+    }
+
+    /// 移除后该应用下次请求会重新弹窗询问
+    static func removeBridgePermission(forCallback callback: String) {
+        bridgePermissions.removeValue(forKey: callback)
+    }
+
     // MARK: - 识别引擎（v3）
 
     static var asrEngine: AsrEngine {

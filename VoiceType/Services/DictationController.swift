@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 
-/// 听写编排：快捷键/面板/桌宠触发 → 录音 → 识别 → 热词纠正 → 注入或回传 → 历史。
+/// 听写编排：快捷键/面板/第三方应用触发 → 录音 → 识别 → 热词纠正 → 注入或回传 → 历史。
 @MainActor
 final class DictationController {
     static let maxRecordingSeconds: TimeInterval = 300
@@ -21,8 +21,10 @@ final class DictationController {
     private var target: DictationTarget = .cursor
     /// 录音正在启动（等麦克风授权）。这期间不再接受新的开始
     private var starting = false
-    /// 启动期间桌宠已经要求结束或取消：启动完成后立刻执行
+    /// 启动期间第三方应用已经要求结束或取消：启动完成后立刻执行
     private var pendingEnd: PendingEnd?
+    /// 授权弹窗正在显示：这期间到达的新 dictate 一律按忙处理，不叠第二个弹窗
+    private var askingPermission = false
 
     init(state: AppState, asr: AsrService, history: HistoryStore, polish: PolishService) {
         self.state = state
@@ -49,10 +51,10 @@ final class DictationController {
         }
     }
 
-    /// 桌宠通过 voicetype:// 发来的请求（v6）
-    func handle(_ request: PetRequest) {
+    /// 第三方应用通过 voicetype:// 发来的请求（v6）
+    func handle(_ request: BridgeRequest) {
         var idle = false
-        if !starting {
+        if !starting && !askingPermission {
             switch state.phase {
             case .idle, .error: idle = true
             default: break
@@ -60,12 +62,25 @@ final class DictationController {
         }
         var meetingRecording = false
         if case .recording = state.meeting { meetingRecording = true }
+        let permission = request.callback.map(SettingsStore.bridgePermission(for:)) ?? .unknown
         let action = request.action(
             idle: idle, recording: starting || state.phase == .recording,
-            meetingRecording: meetingRecording, target: target)
+            meetingRecording: meetingRecording, target: target, permission: permission)
         switch action {
         case .start(let session, let callback):
-            startRecording(target: .pet(session: session, callback: callback))
+            startRecording(target: .external(session: session, callback: callback))
+        case .askPermission(_, let callback):
+            askingPermission = true
+            let decision = BridgePermissionPrompt.ask(callback: callback)
+            askingPermission = false
+            guard let allowed = decision else {
+                // 没有应用能接收这个回调：结果无处可送，不录音
+                NSLog("VoiceType: 回调地址没有对应的应用，忽略请求")
+                return
+            }
+            SettingsStore.setBridgePermission(allowed, for: callback)
+            // 记下选择后重新判定：允许→开始（弹窗期间若已变忙则回 busy）；拒绝→not_allowed
+            handle(request)
         case .finish:
             if starting {
                 pendingEnd = PendingEnd.merge(pendingEnd, .finish)
@@ -79,7 +94,7 @@ final class DictationController {
                 cancelRecording()
             }
         case .refuse(let session, let callback, let reason):
-            PetCallback.send(callback: callback, session: session, outcome: .failure(reason))
+            BridgeCallback.send(callback: callback, session: session, outcome: .failure(reason))
         case .ignore:
             break
         }
@@ -142,7 +157,7 @@ final class DictationController {
                 return
             }
             starting = false
-            // 启动期间桌宠已经要求结束或取消：现在执行
+            // 启动期间第三方应用已经要求结束或取消：现在执行
             let early = pendingEnd
             pendingEnd = nil
             switch early {
@@ -156,18 +171,18 @@ final class DictationController {
         }
     }
 
-    /// 录音没能开始：若由桌宠发起，把原因回传；去向复位。
-    /// 启动期间桌宠已经取消了这次会话时不回传：取消从不回传。
-    private func failStart(_ reason: PetFailure) {
+    /// 录音没能开始：若由第三方应用发起，把原因回传；去向复位。
+    /// 启动期间对方已经取消了这次会话时不回传：取消从不回传。
+    private func failStart(_ reason: BridgeFailure) {
         if pendingEnd != .cancel { reply(target, .failure(reason)) }
         target = .cursor
         pendingEnd = nil
     }
 
-    /// 只有桌宠发起的听写才回传
-    private func reply(_ target: DictationTarget, _ outcome: PetOutcome) {
-        guard case .pet(let session, let callback) = target else { return }
-        PetCallback.send(callback: callback, session: session, outcome: outcome)
+    /// 只有第三方应用发起的听写才回传
+    private func reply(_ target: DictationTarget, _ outcome: BridgeOutcome) {
+        guard case .external(let session, let callback) = target else { return }
+        BridgeCallback.send(callback: callback, session: session, outcome: outcome)
     }
 
     /// 并行建立云端会话；建连失败仅使本次云端不可用（finish 时走本地回退）。
@@ -267,13 +282,13 @@ final class DictationController {
             }
             history.add(
                 text: text, durationSeconds: duration,
-                source: target == .cursor ? "dictation" : "pet", rawText: rawText)
+                source: target == .cursor ? "dictation" : "external", rawText: rawText)
             // 中途断开已在断线时提示过，这里不重复
             let degraded: String? =
                 cloudDegraded && !droppedMidway
                 ? "云端不可用，已用本地识别" : (polishDegraded ? "润色不可用，已输出原文" : nil)
-            if case .pet = target {
-                // 桌宠发起：回传文字，不写剪贴板、不模拟 ⌘V、不引导辅助功能授权
+            if case .external = target {
+                // 第三方应用发起：回传文字，不写剪贴板、不模拟 ⌘V、不引导辅助功能授权
                 state.phase = .idle
                 reply(target, .text(text))
                 showDegraded(degraded)
@@ -308,7 +323,7 @@ final class DictationController {
         }
     }
 
-    /// 丢弃当前录音：不识别、不回传（桌宠取消了这次说话）
+    /// 丢弃当前录音：不识别、不回传（第三方应用取消了这次说话）
     private func cancelRecording() {
         capTimer?.invalidate()
         capTimer = nil

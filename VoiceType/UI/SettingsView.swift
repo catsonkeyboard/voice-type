@@ -25,6 +25,7 @@ private struct GeneralSettingsView: View {
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var loginError: String?
     @State private var accessibilityTrusted = TextInjector.isTrusted
+    @State private var bridgePermissions = SettingsStore.bridgePermissions
 
     var body: some View {
         Form {
@@ -49,6 +50,21 @@ private struct GeneralSettingsView: View {
                             TextInjector.promptForAccessibility()
                         }
                     }
+                }
+            }
+
+            Section("第三方应用") {
+                if bridgePermissions.isEmpty {
+                    Text("其他应用可以通过 voicetype:// 请求 VoiceType 听写并接收识别文字。应用第一次请求时会弹窗确认，确认结果会列在这里。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(bridgePermissions.keys.sorted(), id: \.self) { callback in
+                        bridgePermissionRow(callback: callback, allowed: bridgePermissions[callback] ?? false)
+                    }
+                    Text("移除后，该应用下次请求时会重新弹窗确认。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -107,6 +123,31 @@ private struct GeneralSettingsView: View {
         .onAppear {
             accessibilityTrusted = TextInjector.isTrusted
             launchAtLogin = SMAppService.mainApp.status == .enabled
+            bridgePermissions = SettingsStore.bridgePermissions
+        }
+    }
+
+    private func bridgePermissionRow(callback: String, allowed: Bool) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(URL(string: callback).map(BridgePermissionPrompt.appName(for:)) ?? callback)
+                Text(callback)
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            if allowed {
+                Label("已允许", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+            } else {
+                Label("已拒绝", systemImage: "xmark.circle.fill")
+                    .foregroundStyle(.red)
+            }
+            Button("移除") {
+                SettingsStore.removeBridgePermission(forCallback: callback)
+                bridgePermissions = SettingsStore.bridgePermissions
+            }
+            .controlSize(.small)
         }
     }
 }
