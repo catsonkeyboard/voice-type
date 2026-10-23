@@ -13,6 +13,10 @@ final class DictationController {
     private let history: HistoryStore
     private let recorder = AudioRecorder()
     private var capTimer: Timer?
+    /// 边录边跟踪人声，用来自动结束（见 SpeechGate.watch）
+    private var speechTracker = SpeechGate.Tracker()
+    /// 已经因为没有人声或安静太久而要求结束，避免重复触发
+    private var autoEnding = false
     private var promptedAccessibility = false
     private var cloudSession: DashScopeAsrSession?
     /// 云端会话在录音中途断开：本次结束直接走本地识别并提示
@@ -136,8 +140,11 @@ final class DictationController {
                 recorder.onLevel = { [weak self] level in
                     self?.state.micLevel = level
                 }
+                speechTracker = SpeechGate.Tracker()
+                autoEnding = false
                 recorder.onChunk = { [weak self] chunk in
                     self?.cloudSession?.send(samples: chunk)
+                    self?.watchSpeech(chunk)
                 }
                 try recorder.start()
                 state.phase = .recording
@@ -335,6 +342,22 @@ final class DictationController {
         } else {
             HUDController.shared.hide()
         }
+    }
+
+    /// 边录边看有没有人声：开头一直没人说话，或说完后安静很久，就像再按一次快捷键那样结束。
+    /// 没人说话的录音会在结束时被 SpeechGate 判成「没说话」。
+    private func watchSpeech(_ chunk: [Float]) {
+        guard state.phase == .recording, !autoEnding else { return }
+        speechTracker.feed(chunk[...])
+        let verdict = SpeechGate.watch(speechTracker)
+        guard verdict != .keepGoing else { return }
+        autoEnding = true
+        if verdict == .noSpeech {
+            NSLog("VoiceType: 开头 %.0f 秒没有人声，自动结束录音", SpeechGate.noSpeechTimeoutSeconds)
+        } else {
+            NSLog("VoiceType: 说完后安静了 %.0f 秒，自动结束录音", SpeechGate.trailingSilenceSeconds)
+        }
+        Task { @MainActor in await self.finishRecording() }
     }
 
     /// 丢弃当前录音：不识别、不回传（第三方应用取消了这次说话）

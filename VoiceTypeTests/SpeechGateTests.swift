@@ -94,6 +94,55 @@ final class SpeechGateTests: XCTestCase {
         XCTAssertTrue(SpeechGate.hasSpeech(samples))
     }
 
+    func testFeedingInChunksMatchesAnalyzingAtOnce() {
+        var samples = noise(2, amplitude: 0.004)
+        tone(&samples, start: 0.5, seconds: 0.4, amplitude: 0.08)
+        tone(&samples, start: 1.2, seconds: 0.1, amplitude: 0.3)
+        var tracker = SpeechGate.Tracker()
+        var offset = 0
+        for size in [100, 1000, 333, 4096, 7] where offset < samples.count {
+            let end = min(offset + size, samples.count)
+            tracker.feed(samples[offset..<end])
+            offset = end
+        }
+        tracker.feed(samples[offset...])
+        tracker.finish()
+        XCTAssertEqual(tracker.analysis, SpeechGate.analyze(samples + silence(SpeechGate.tailIgnoredSeconds)))
+    }
+
+    func testNobodySpeaksForThirtySeconds() {
+        var tracker = SpeechGate.Tracker()
+        tracker.feed(noise(29.9, amplitude: 0.004)[...])
+        XCTAssertEqual(SpeechGate.watch(tracker), .keepGoing)
+        tracker.feed(noise(0.2, amplitude: 0.004)[...])
+        XCTAssertEqual(SpeechGate.watch(tracker), .noSpeech)
+    }
+
+    func testQuietForFifteenSecondsAfterSpeaking() {
+        var speech = silence(1)
+        tone(&speech, start: 0.2, seconds: 0.6, amplitude: 0.08)
+        var tracker = SpeechGate.Tracker()
+        tracker.feed(speech[...])
+        tracker.feed(noise(14.5, amplitude: 0.004)[...])
+        // 说完 0.2 秒 + 14.5 秒，还不到 15 秒
+        XCTAssertEqual(SpeechGate.watch(tracker), .keepGoing)
+        tracker.feed(noise(0.5, amplitude: 0.004)[...])
+        XCTAssertEqual(SpeechGate.watch(tracker), .wentQuiet)
+    }
+
+    func testAPauseShorterThanFifteenSecondsKeepsRecording() {
+        var tracker = SpeechGate.Tracker()
+        var first = silence(1)
+        tone(&first, start: 0.2, seconds: 0.6, amplitude: 0.08)
+        tracker.feed(first[...])
+        tracker.feed(silence(10)[...])
+        var second = silence(1)
+        tone(&second, start: 0.1, seconds: 0.6, amplitude: 0.08)
+        tracker.feed(second[...])
+        tracker.feed(silence(10)[...])
+        XCTAssertEqual(SpeechGate.watch(tracker), .keepGoing)
+    }
+
     func testStripsSilenceTokens() {
         XCTAssertEqual(SpeechGate.stripSilenceTokens("/sil"), "")
         XCTAssertEqual(SpeechGate.stripSilenceTokens(" /sil "), "")
