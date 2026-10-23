@@ -234,15 +234,23 @@ final class DictationController {
         state.partialText = nil
 
         let duration = Double(samples.count) / 16000.0
+        // 先留调试录音：被下面挡掉的也留一份，方便核对人声门槛
+        DebugAudioDump.write(samples: samples)
+        let speech = SpeechGate.analyze(samples)
         // 太短，或只录到按键声、底噪：不送去识别，否则模型会幻听出文字（见 SpeechGate）
-        guard duration >= Self.minRecordingSeconds, SpeechGate.hasSpeech(samples) else {
+        guard duration >= Self.minRecordingSeconds, speech.hasSpeech else {
+            if duration >= Self.minRecordingSeconds {
+                // 只记数字，不含录音内容
+                NSLog(
+                    "VoiceType: 没有检测到人声（最长连续 %.2f 秒，最大音量 %.3f），按没说话处理",
+                    speech.longestRunSeconds, Double(speech.peakLevel))
+            }
             session?.cancel()
             state.phase = .idle
             HUDController.shared.hide()
             reply(target, .failure(.empty))
             return
         }
-        DebugAudioDump.write(samples: samples)
         state.phase = .transcribing
         do {
             var cloudDegraded = false

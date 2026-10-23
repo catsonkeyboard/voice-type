@@ -28,7 +28,7 @@
 示例：注册了 `myapp://` 的应用传 `callback=myapp%3A%2F%2Fvoicetype-result`，收到 `myapp://voicetype-result?session=…&text=…`。
 
 - session 由请求方生成，1–64 个字母、数字或连字符。
-- 原因：`empty`（没说话：录音太短，或只录到按键声、底噪；识别前先检查有没有至少 0.15 秒的人声）、`mic_denied`、`not_ready`（模型没装或云端没填密钥）、`busy`、`not_allowed`（用户拒绝了这个应用）、`failed`。
+- 原因：`empty`（没说话：录音太短，或只录到按键声、底噪；识别前先检查有没有连续至少 0.15 秒的人声，不看结尾 0.15 秒里的按键声）、`mic_denied`、`not_ready`（模型没装或云端没填密钥）、`busy`、`not_allowed`（用户拒绝了这个应用）、`failed`。
 - 文字里除字母、数字和 `-._~` 以外的字节全部百分号编码（空格 `%20`、加号 `%2B`，按表单规则解码也不出错）。
 - 文字全部放在 URL 里，不写临时文件。实测 135 KB 的 URL 也能完整送达，5 分钟听写约 14 KB。
 
