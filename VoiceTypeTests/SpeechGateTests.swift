@@ -143,6 +143,16 @@ final class SpeechGateTests: XCTestCase {
         XCTAssertEqual(SpeechGate.watch(tracker), .keepGoing)
     }
 
+    func testDigitalSilenceMeansTheMicrophoneWasBlocked() {
+        // 2026-10-23 实测：录音中途被撤销麦克风授权后，系统送来的是全 0
+        XCTAssertTrue(SpeechGate.isDigitalSilence(silence(1)))
+        XCTAssertFalse(SpeechGate.isDigitalSilence([]))
+        XCTAssertFalse(SpeechGate.isDigitalSilence(noise(1, amplitude: 0.0005)))
+        var almost = silence(1)
+        almost[8000] = 0.0001
+        XCTAssertFalse(SpeechGate.isDigitalSilence(almost))
+    }
+
     func testStripsSilenceTokens() {
         XCTAssertEqual(SpeechGate.stripSilenceTokens("/sil"), "")
         XCTAssertEqual(SpeechGate.stripSilenceTokens(" /sil "), "")

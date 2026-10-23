@@ -243,6 +243,15 @@ final class DictationController {
         let duration = Double(samples.count) / 16000.0
         // 先留调试录音：被下面挡掉的也留一份，方便核对人声门槛
         DebugAudioDump.write(samples: samples)
+        // 录了 0.5 秒以上却全是绝对的 0：麦克风被系统拦下了，按没有授权处理，不是没说话
+        if duration >= Self.minRecordingSeconds, SpeechGate.isDigitalSilence(samples) {
+            NSLog("VoiceType: 录音全是静音数据，麦克风可能没有授权")
+            session?.cancel()
+            state.phase = .error("麦克风没有收到声音")
+            HUDController.shared.flash("麦克风没有收到声音，请在系统设置中允许 VoiceType 使用麦克风", state: state)
+            reply(target, .failure(.micDenied))
+            return
+        }
         let speech = SpeechGate.analyze(samples)
         // 太短，或只录到按键声、底噪：不送去识别，否则模型会幻听出文字（见 SpeechGate）
         guard duration >= Self.minRecordingSeconds, speech.hasSpeech else {

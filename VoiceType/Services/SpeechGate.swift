@@ -132,6 +132,12 @@ enum SpeechGate {
         return tracker.analysis
     }
 
+    /// 纯函数：整段都是绝对的 0。真实麦克风总有底噪，这只会是麦克风被系统拦下了
+    /// （运行中被撤销了授权，或设备被静音），不是没说话
+    static func isDigitalSilence(_ samples: [Float]) -> Bool {
+        !samples.isEmpty && samples.allSatisfy { $0 == 0 }
+    }
+
     /// 纯函数：录音里有没有足够长的连续人声
     static func hasSpeech(_ samples: [Float], sampleRate: Int = 16000) -> Bool {
         analyze(samples, sampleRate: sampleRate).hasSpeech
