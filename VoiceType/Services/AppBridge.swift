@@ -21,7 +21,7 @@ enum DictationTarget: Equatable {
 
 /// 没有文字可给时的原因（回传 URL 里的 error 参数）
 enum BridgeFailure: String, Equatable {
-    /// 没说话，或录音太短
+    /// 没说话：录音太短，或只录到按键声、底噪（见 SpeechGate）
     case empty
     case micDenied = "mic_denied"
     /// 本地模型没装，或云端引擎没填密钥

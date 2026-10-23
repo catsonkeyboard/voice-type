@@ -234,7 +234,8 @@ final class DictationController {
         state.partialText = nil
 
         let duration = Double(samples.count) / 16000.0
-        guard duration >= Self.minRecordingSeconds else {
+        // 太短，或只录到按键声、底噪：不送去识别，否则模型会幻听出文字（见 SpeechGate）
+        guard duration >= Self.minRecordingSeconds, SpeechGate.hasSpeech(samples) else {
             session?.cancel()
             state.phase = .idle
             HUDController.shared.hide()
@@ -258,6 +259,8 @@ final class DictationController {
                 if SettingsStore.asrEngine == .dashscope { cloudDegraded = true }
                 text = try await asr.transcribe(samples: samples)
             }
+            // 去掉模型漏出来的静音标记（/sil 等），只剩它们时按没说话处理
+            text = SpeechGate.stripSilenceTokens(text)
             // 热词纠正在后台执行（拼音转换+编辑距离开销与文本长度成正比）
             let hotwords = DevGlossary.merged(withUser: SettingsStore.hotwords)
             text = await Task.detached(priority: .userInitiated) {
