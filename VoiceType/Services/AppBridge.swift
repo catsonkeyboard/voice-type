@@ -56,6 +56,8 @@ enum BridgeAction: Equatable {
     case finish
     /// 丢弃当前录音，不回传
     case cancel
+    /// 录音已结束、正在识别的这次会话被取消：识别完不回传（结果照常进历史记录）
+    case dropReply
     /// 不开始录音，立刻回传失败
     case refuse(session: String, callback: URL, reason: BridgeFailure)
     case ignore
@@ -124,9 +126,10 @@ enum BridgeRequest: Equatable {
     /// - meetingRecording：会议录音进行中
     /// - target：当前这次听写的去向
     /// - permission：dictate 的回调地址的授权状态（stop/cancel 不看）
+    /// - transcribing：录音已结束、还在识别没回传的第三方会话（没有就是 nil）
     func action(
         idle: Bool, recording: Bool, meetingRecording: Bool, target: DictationTarget,
-        permission: BridgePermission
+        permission: BridgePermission, transcribing: String? = nil
     ) -> BridgeAction {
         switch self {
         case .dictate(let session, let callback):
@@ -144,7 +147,9 @@ enum BridgeRequest: Equatable {
         case .stop(let session):
             return recording && target.isExternal(session) ? .finish : .ignore
         case .cancel(let session):
-            return recording && target.isExternal(session) ? .cancel : .ignore
+            if recording && target.isExternal(session) { return .cancel }
+            // 第三方应用在结果回来之前退出了：回传会把它重新拉起来，所以不回传
+            return transcribing == session ? .dropReply : .ignore
         }
     }
 }

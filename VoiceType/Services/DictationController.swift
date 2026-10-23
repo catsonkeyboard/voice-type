@@ -23,6 +23,10 @@ final class DictationController {
     private var cloudDroppedMidway = false
     /// 当前这次听写的去向；结束或取消时复位为 .cursor
     private var target: DictationTarget = .cursor
+    /// 录音已结束、还在识别没回传的第三方会话
+    private var transcribingSession: String?
+    /// 识别期间被第三方应用取消的会话：识别完不回传
+    private var droppedSession: String?
     /// 录音正在启动（等麦克风授权）。这期间不再接受新的开始
     private var starting = false
     /// 启动期间第三方应用已经要求结束或取消：启动完成后立刻执行
@@ -69,7 +73,8 @@ final class DictationController {
         let permission = request.callback.map(SettingsStore.bridgePermission(for:)) ?? .unknown
         let action = request.action(
             idle: idle, recording: starting || state.phase == .recording,
-            meetingRecording: meetingRecording, target: target, permission: permission)
+            meetingRecording: meetingRecording, target: target, permission: permission,
+            transcribing: transcribingSession)
         switch action {
         case .start(let session, let callback):
             startRecording(target: .external(session: session, callback: callback))
@@ -97,6 +102,8 @@ final class DictationController {
             } else {
                 cancelRecording()
             }
+        case .dropReply:
+            droppedSession = transcribingSession
         case .refuse(let session, let callback, let reason):
             BridgeCallback.send(callback: callback, session: session, outcome: .failure(reason))
         case .ignore:
@@ -189,6 +196,13 @@ final class DictationController {
     /// 只有第三方应用发起的听写才回传
     private func reply(_ target: DictationTarget, _ outcome: BridgeOutcome) {
         guard case .external(let session, let callback) = target else { return }
+        if transcribingSession == session { transcribingSession = nil }
+        if droppedSession == session {
+            // 第三方应用在结果回来之前退出了：回传会把它重新拉起来
+            droppedSession = nil
+            NSLog("VoiceType: 第三方应用已取消这次听写，结果不回传")
+            return
+        }
         BridgeCallback.send(callback: callback, session: session, outcome: outcome)
     }
 
@@ -232,6 +246,11 @@ final class DictationController {
         // 去向在这里取走：识别期间开始的下一次听写不受影响
         let target = self.target
         self.target = .cursor
+        // 识别期间第三方应用还可能取消这次会话（它要退出了），见 BridgeAction.dropReply
+        if case .external(let session, _) = target {
+            transcribingSession = session
+            droppedSession = nil
+        }
         let samples = recorder.stop()
         recorder.onChunk = nil
         let session = cloudSession

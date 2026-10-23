@@ -223,6 +223,33 @@ final class AppBridgeTests: XCTestCase {
 
     // MARK: - 启动期间的结束请求
 
+    func testCancelWhileTranscribingDropsOnlyThatSessionsReply() {
+        // 结束录音后、结果回传前，第三方应用退出时发来的取消：识别完不回传（2026-10-24）
+        let cancel = BridgeRequest.cancel(session: "s1")
+        XCTAssertEqual(
+            cancel.action(
+                idle: false, recording: false, meetingRecording: false, target: .cursor,
+                permission: .unknown, transcribing: "s1"),
+            .dropReply)
+        XCTAssertEqual(
+            BridgeRequest.cancel(session: "s2").action(
+                idle: false, recording: false, meetingRecording: false, target: .cursor,
+                permission: .unknown, transcribing: "s1"),
+            .ignore)
+        // 结束请求在识别阶段没有意义
+        XCTAssertEqual(
+            BridgeRequest.stop(session: "s1").action(
+                idle: false, recording: false, meetingRecording: false, target: .cursor,
+                permission: .unknown, transcribing: "s1"),
+            .ignore)
+        // 不在识别时一切照旧
+        XCTAssertEqual(
+            cancel.action(
+                idle: true, recording: false, meetingRecording: false, target: .cursor,
+                permission: .unknown),
+            .ignore)
+    }
+
     func testPendingEndMergeLetsACancelWin() {
         XCTAssertEqual(PendingEnd.merge(nil, .finish), .finish)
         XCTAssertEqual(PendingEnd.merge(nil, .cancel), .cancel)

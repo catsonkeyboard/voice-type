@@ -21,7 +21,7 @@
 |---|---|---|
 | 应用 → VoiceType | `voicetype://dictate?session=<id>&callback=<URL 编码的回调地址>` | 开始录音 |
 | 应用 → VoiceType | `voicetype://stop?session=<id>` | 结束录音并识别 |
-| 应用 → VoiceType | `voicetype://cancel?session=<id>` | 丢弃这次录音，不回传 |
+| 应用 → VoiceType | `voicetype://cancel?session=<id>` | 丢弃这次录音，不回传；录音已结束、还在识别时收到，识别完也不回传（2026-10-24） |
 | VoiceType → 应用 | `<回调地址>?session=<id>&text=<文字>` | 识别成功 |
 | VoiceType → 应用 | `<回调地址>?session=<id>&error=<原因>` | 没有文字可给 |
 
@@ -57,6 +57,7 @@ scheme 统一转成小写后作为授权记录的键，避免同一地址因大�
 - 弹窗显示期间到达的新 `dictate` 按忙处理，不叠第二个弹窗。
 - 允许与拒绝都持久化在 UserDefaults（`bridgePermissions`：回调地址 → 是否允许）。设置 → 通用 → 第三方应用 列出全部记录，可逐条移除；移除后该应用下次请求重新询问。
 - `stop`、`cancel` 只作用于当前那次由同一 session 发起的录音，不需要再判断授权。
+- 识别阶段（录音已结束、结果还没回传）收到同一 session 的 `cancel`：识别照常完成、进历史记录，但不回传。第三方应用在结果回来前退出时会这样做，否则回传会把它重新拉起来。
 
 ## 4. 实现
 
