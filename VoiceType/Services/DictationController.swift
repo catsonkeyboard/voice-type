@@ -267,8 +267,9 @@ final class DictationController {
                 if SettingsStore.asrEngine == .dashscope { cloudDegraded = true }
                 text = try await asr.transcribe(samples: samples)
             }
-            // 去掉模型漏出来的静音标记（/sil 等），只剩它们时按没说话处理
-            text = SpeechGate.stripSilenceTokens(text)
+            // 去掉模型漏出来的静音标记（/sil 等），只剩它们时按没说话处理；
+            // 模型卡在循环里反复输出的片段只留一份（见 RepetitionGuard）
+            text = RepetitionGuard.collapse(SpeechGate.stripSilenceTokens(text))
             // 热词纠正在后台执行（拼音转换+编辑距离开销与文本长度成正比）
             let hotwords = DevGlossary.merged(withUser: SettingsStore.hotwords)
             text = await Task.detached(priority: .userInitiated) {
@@ -285,8 +286,10 @@ final class DictationController {
             if SettingsStore.polishEnabled, text.count >= 5 {
                 state.phase = .polishing
                 if let polished = await polish.polish(text) {
-                    if polished != text { rawText = text }
-                    text = polished
+                    // 润色模型同样可能陷入循环
+                    let cleaned = RepetitionGuard.collapse(polished)
+                    if cleaned != text { rawText = text }
+                    text = cleaned
                 } else {
                     polishDegraded = true
                 }
