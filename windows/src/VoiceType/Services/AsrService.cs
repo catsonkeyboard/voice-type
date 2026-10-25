@@ -40,16 +40,53 @@ public sealed class AsrService : IDisposable
         finally { _gate.Release(); }
     });
 
-    /// <summary>切换档位后调用：释放旧模型并立即按新档位重载</summary>
+    /// <summary>
+    /// 切换档位后调用：释放旧模型并按新档位重载。
+    /// Dispose 与模型加载（可能上 GB）必须在线程池执行——本方法常从设置窗口
+    /// 调用，await 后的续体会回到 UI 线程，直接在这里加载会卡住整个界面。
+    /// 新档位未安装不抛（启动预热同款语义）：保持未加载态，转写入口有提示。
+    /// </summary>
     public async Task ReloadAsync()
     {
         await _gate.WaitAsync();
         try
         {
-            _recognizer?.Dispose();
-            _recognizer = null;
-            _loadedModel = null;
-            _ = LoadedRecognizer();
+            await Task.Run(() =>
+            {
+                _recognizer?.Dispose();
+                _recognizer = null;
+                _loadedModel = null;
+                try
+                {
+                    _ = LoadedRecognizer();
+                }
+                catch (AsrException)
+                {
+                    // 新档位未安装属正常态
+                }
+            });
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>当前已加载到内存的档位（未加载为 null）</summary>
+    public LocalAsrModel? LoadedModel => _loadedModel;
+
+    /// <summary>卸载当前模型（删除模型文件前必须先调用：文件被 ONNX Runtime 占用时删不掉）</summary>
+    public async Task UnloadAsync()
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            await Task.Run(() =>
+            {
+                _recognizer?.Dispose();
+                _recognizer = null;
+                _loadedModel = null;
+            });
         }
         finally
         {
