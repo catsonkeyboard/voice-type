@@ -25,6 +25,11 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        DiagnosticsLog.Write($"startup begin, args={e.Args.Length}");
+        DispatcherUnhandledException += (_, ex) =>
+            DiagnosticsLog.Write("dispatcher unhandled", ex.Exception);
+        AppDomain.CurrentDomain.UnhandledException += (_, ex) =>
+            DiagnosticsLog.Write($"domain unhandled: {ex.ExceptionObject}");
 
         // 第三方应用联动（v6）：注册 voicetype://，使 shell 能用 URL 拉起/唤起本应用
         BridgeTransport.RegisterScheme();
@@ -49,12 +54,14 @@ public partial class App : Application
         }
 
         _deps = AppDependencies.Shared;
+        DiagnosticsLog.Write("deps ready");
         CreateTray();
         PanelWindow.ShowPanel();
         StartBridgePipeServer();
-        // 冷启动：应用本来就是被这个 URL 拉起来的，依赖就绪后立刻处理
+        // 冷启动：应用本来就是被这个 URL 拉起的，依赖就绪后立刻处理
         if (bridgeUrl is not null)
             HandleBridgeUrl(bridgeUrl);
+        DiagnosticsLog.Write("startup done");
     }
 
     /// <summary>第二个实例把 voicetype:// URL 发给已在运行的实例（1.5s 等不到就放弃，不报错）</summary>
@@ -161,6 +168,18 @@ public partial class App : Application
         _tray.ContextMenu = menu;
 
         _tray.TrayLeftMouseUp += (_, _) => PanelWindow.ShowPanel();
+        try
+        {
+            // 纯代码创建的 TaskbarIcon 不在可视化树里，Loaded 永远不会触发，
+            // 必须显式 ForceCreate 才会向系统注册托盘图标（H.NotifyIcon v2 的
+            // windowless 官方用法；缺了这一步就是「进程活着但托盘无图标」）
+            _tray.ForceCreate();
+            DiagnosticsLog.Write("tray force-created");
+        }
+        catch (Exception ex)
+        {
+            DiagnosticsLog.Write("tray ForceCreate failed", ex);
+        }
 
         // 图标随阶段切换：录音时红点
         _deps.State.PropertyChanged += (s, e) =>
