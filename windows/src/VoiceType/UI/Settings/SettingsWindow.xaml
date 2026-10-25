@@ -30,6 +30,33 @@
 
                     <Separator Margin="0,16"/>
 
+                    <TextBlock Text="第三方应用" FontWeight="Bold" Margin="0,0,0,8"/>
+                    <ItemsControl x:Name="BridgePermissionList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding Callback}" FontSize="12"
+                                               FontFamily="Consolas" VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="{Binding Status}" FontSize="12" Grid.Column="1"
+                                               Foreground="{Binding Color}"
+                                               VerticalAlignment="Center" Margin="8,0,8,0"/>
+                                    <Button Content="移除" Grid.Column="2" Padding="8,2"
+                                            Click="OnRemoveBridgePermission" Tag="{Binding Callback}"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock x:Name="BridgePermissionHint" FontSize="11" Foreground="#8B949E"
+                               TextWrapping="Wrap" Margin="0,6,0,0"/>
+
+                    <Separator Margin="0,16"/>
+
                     <TextBlock Text="模型" FontWeight="Bold" Margin="0,0,0,8"/>
                     <ItemsControl x:Name="ModelStatusList" Margin="0,0,0,4">
                         <ItemsControl.ItemTemplate>

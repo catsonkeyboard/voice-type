@@ -22,6 +22,8 @@ public partial class SettingsWindow : Window
 
     private sealed record ModelRow(string Name, string Status, Brush Color, string Note, LocalAsrModel Value);
 
+    private sealed record BridgeRow(string Callback, string Status, Brush Color);
+
     private static readonly Brush OkBrush = new SolidColorBrush(Color.FromRgb(0x3F, 0xB9, 0x50));
     private static readonly Brush WarnBrush = new SolidColorBrush(Color.FromRgb(0xD2, 0x99, 0x22));
 
@@ -76,6 +78,31 @@ public partial class SettingsWindow : Window
         RefreshEngineSections();
         RefreshModelStatus();
         RefreshHotwordsCount();
+        RefreshBridgePermissions();
+    }
+
+    // ----- 第三方应用联动（v6） -----
+
+    private void RefreshBridgePermissions()
+    {
+        IReadOnlyDictionary<string, bool> permissions = _deps.Settings.BridgePermissions;
+        BridgePermissionList.ItemsSource = permissions.Keys.OrderBy(k => k)
+            .Select(k => new BridgeRow(
+                k, permissions[k] ? "已允许" : "已拒绝", permissions[k] ? OkBrush : WarnBrush))
+            .ToList();
+        BridgePermissionHint.Text = permissions.Count == 0
+            ? "其他应用可以通过 voicetype:// 请求 VoiceType 听写并接收识别文字。"
+                + "应用第一次请求时会弹窗确认，确认结果会列在这里。"
+            : "移除后，该应用下次请求时会重新弹窗确认。";
+    }
+
+    private void OnRemoveBridgePermission(object sender, RoutedEventArgs e)
+    {
+        if (((System.Windows.Controls.Button)sender).Tag is string callback)
+        {
+            _deps.Settings.RemoveBridgePermission(callback);
+            RefreshBridgePermissions();
+        }
     }
 
     // ----- 通用 -----

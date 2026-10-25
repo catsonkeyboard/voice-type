@@ -1,9 +1,12 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
+using System.IO.Pipes;
 using System.Windows;
 using System.Windows.Media;
 using H.NotifyIcon;
 using VoiceType.Core;
+using VoiceType.Services;
 using VoiceType.UI;
 using VoiceType.UI.Panel;
 
@@ -23,11 +26,24 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        // 第三方应用联动（v6）：注册 voicetype://，使 shell 能用 URL 拉起/唤起本应用
+        BridgeTransport.RegisterScheme();
+        string? bridgeUrl = e.Args.FirstOrDefault(
+            a => a.StartsWith($"{BridgeTransport.Scheme}://", StringComparison.OrdinalIgnoreCase));
+
         _singleInstanceMutex = new Mutex(true, "VoiceTypeWinSingleInstance", out bool isNew);
         if (!isNew)
         {
-            MessageBox.Show("VoiceType 已在运行（请查看系统托盘）。", "VoiceType",
-                MessageBoxButton.OK, MessageBoxImage.Information);
+            if (bridgeUrl is not null)
+            {
+                // 已在运行：把 URL 静默转发给第一个实例，不弹框（对应 macOS 的 GetURL 事件）
+                ForwardToRunningInstance(bridgeUrl);
+            }
+            else
+            {
+                MessageBox.Show("VoiceType 已在运行（请查看系统托盘）。", "VoiceType",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+            }
             Shutdown();
             return;
         }
@@ -35,6 +51,85 @@ public partial class App : Application
         _deps = AppDependencies.Shared;
         CreateTray();
         PanelWindow.ShowPanel();
+        StartBridgePipeServer();
+        // 冷启动：应用本来就是被这个 URL 拉起来的，依赖就绪后立刻处理
+        if (bridgeUrl is not null)
+            HandleBridgeUrl(bridgeUrl);
+    }
+
+    /// <summary>第二个实例把 voicetype:// URL 发给已在运行的实例（1.5s 等不到就放弃，不报错）</summary>
+    private static void ForwardToRunningInstance(string url)
+    {
+        try
+        {
+            using var client = new NamedPipeClientStream(
+                ".", BridgeTransport.PipeName, PipeDirection.Out);
+            client.Connect(1500);
+            using var writer = new StreamWriter(client) { AutoFlush = true };
+            writer.Write(url);
+        }
+        catch
+        {
+            // 对方没接上（旧版本在跑等）：静默放弃
+        }
+    }
+
+    /// <summary>常驻接收第二实例转发来的 voicetype:// URL（仅当前用户可连）</summary>
+    private void StartBridgePipeServer()
+    {
+        _ = Task.Run(async () =>
+        {
+            while (true)
+            {
+                NamedPipeServerStream server;
+                try
+                {
+                    server = new NamedPipeServerStream(
+                        BridgeTransport.PipeName, PipeDirection.In,
+                        maxNumberOfServerInstances: 1,
+                        transmissionMode: PipeTransmissionMode.Byte,
+                        options: PipeOptions.CurrentUserOnly);
+                }
+                catch
+                {
+                    return;
+                }
+                using (server)
+                {
+                    try
+                    {
+                        await server.WaitForConnectionAsync();
+                        using var reader = new StreamReader(server);
+                        string? url = await reader.ReadToEndAsync();
+                        if (!string.IsNullOrWhiteSpace(url))
+                            await Dispatcher.InvokeAsync(() => HandleBridgeUrl(url.Trim()));
+                    }
+                    catch
+                    {
+                        // 单个连接出错不影响继续接收
+                    }
+                }
+            }
+        });
+    }
+
+    /// <summary>解析并分发一个 voicetype:// URL；只记日志行，不写 URL 的任何部分</summary>
+    private void HandleBridgeUrl(string url)
+    {
+        try
+        {
+            BridgeRequest? request = BridgeRequest.Parse(url);
+            if (request is null)
+            {
+                Debug.WriteLine("VoiceType: 忽略了一个无法识别的 voicetype:// 请求");
+                return;
+            }
+            _deps.Dictation.Handle(request);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"VoiceType: 处理 voicetype:// 请求异常（{ex.GetType().Name}）");
+        }
     }
 
     private void CreateTray()
