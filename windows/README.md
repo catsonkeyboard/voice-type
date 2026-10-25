@@ -29,8 +29,10 @@ NuGet 包 `org.k2fsa.sherpa.onnx.runtime.win-x64` 自动分发，`dotnet build` 
     # 可选（内网无 NuGet 时手动部署原生 DLL）：
     powershell -ExecutionPolicy Bypass -File windows\scripts\fetch_deps.ps1
 
-模型安装到 `%APPDATA%\VoiceType\models\`（与 macOS 端同一布局，模型文件通用）。VAD 模型
-`silero_vad.onnx` 由 download_models.ps1 自动补齐（export_sensevoice.ps1 也会顺带下载）；
+模型安装到 `%APPDATA%\VoiceType\models\`（与 macOS 端同一布局，模型文件通用）。除脚本外，
+也可以在 设置 → 识别 中直接用每行的「安装 / 删除」按钮管理识别模型与说话人分离模型
+（应用内下载，来源与脚本一致，装识别档位时同样自动补齐 VAD）。VAD 模型 `silero_vad.onnx`
+由 download_models.ps1 自动补齐（export_sensevoice.ps1 也会顺带下载）；
 仅影响 >20s 长音频分段与文件转写。
 
 运行：`windows\src\VoiceType\bin\Release\net10.0-windows\win-x64\VoiceType.exe`（托盘常驻，左键托盘打开面板）。

@@ -116,12 +116,16 @@
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="160"/>
                                                 <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Text="{Binding Name}" FontSize="12"
                                                        VerticalAlignment="Center"/>
                                             <TextBlock Text="{Binding Status}" FontSize="12"
                                                        Foreground="{Binding Color}" Grid.Column="1"
                                                        VerticalAlignment="Center"/>
+                                            <Button Content="{Binding Action}" Grid.Column="2"
+                                                    Padding="10,2" Click="OnModelAction"
+                                                    Tag="{Binding Value}"/>
                                         </Grid>
                                         <TextBlock Text="{Binding Note}" FontSize="11"
                                                    Foreground="#8B949E"/>
@@ -129,6 +133,13 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+                        <StackPanel x:Name="InstallProgressPanel" Visibility="Collapsed"
+                                    Margin="0,6,0,0">
+                            <TextBlock x:Name="InstallProgressText" FontSize="11"
+                                       Foreground="#57606A"/>
+                            <ProgressBar x:Name="InstallProgressBar" Height="6" Margin="0,4,0,0"
+                                         Maximum="100"/>
+                        </StackPanel>
                         <TextBlock x:Name="InstallCommandText" FontSize="11"
                                    FontFamily="Consolas" Foreground="#57606A"
                                    Visibility="Collapsed" Margin="0,4,0,0"/>
@@ -137,10 +148,14 @@
                     <Separator Margin="0,16"/>
 
                     <TextBlock Text="说话人分离（会议转写）" FontWeight="Bold" Margin="0,0,0,8"/>
-                    <TextBlock x:Name="DiarizationStatus" FontSize="12" Margin="0,0,0,4"/>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock x:Name="DiarizationStatus" FontSize="12" VerticalAlignment="Center"/>
+                        <Button x:Name="DiarizationAction" Padding="10,4" Margin="12,0,0,0"
+                                Click="OnDiarizationAction"/>
+                    </StackPanel>
                     <TextBlock x:Name="DiarizationInstallHint" FontSize="11"
                                FontFamily="Consolas" Foreground="#57606A"
-                               Visibility="Collapsed"/>
+                               Visibility="Collapsed" Margin="0,4,0,0"/>
 
                     <!-- DashScope -->
                     <StackPanel x:Name="DashSection" Margin="0,16,0,0" Visibility="Collapsed">

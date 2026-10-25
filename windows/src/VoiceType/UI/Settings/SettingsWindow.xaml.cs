@@ -20,7 +20,8 @@ public partial class SettingsWindow : Window
         _instance.Activate();
     }
 
-    private sealed record ModelRow(string Name, string Status, Brush Color, string Note, LocalAsrModel Value);
+    private sealed record ModelRow(
+        string Name, string Status, Brush Color, string Note, LocalAsrModel Value, string Action);
 
     private sealed record BridgeRow(string Callback, string Status, Brush Color);
 
@@ -50,7 +51,7 @@ public partial class SettingsWindow : Window
         EngineLocalRadio.IsChecked = s.AsrEngine == AsrEngine.Local;
         EngineDashRadio.IsChecked = s.AsrEngine == AsrEngine.DashScope;
         LocalModelCombo.ItemsSource = Enum.GetValues<LocalAsrModel>()
-            .Select(m => new ModelRow(m.Label(), "", OkBrush, m.Note(), m))
+            .Select(m => new ModelRow(m.Label(), "", OkBrush, m.Note(), m, ""))
             .ToList();
         LocalModelCombo.SelectedValue = s.LocalAsrModel;
         // Load 期间 SelectionChanged 被抑制，说明文本需手动补
@@ -187,15 +188,20 @@ public partial class SettingsWindow : Window
         Brush Color(bool ok) => ok ? OkBrush : WarnBrush;
 
         ModelStatusList.ItemsSource = Enum.GetValues<LocalAsrModel>()
-            .Select(m => new ModelRow(
-                m.Label(), Status(ModelPaths.IsPresent(m)), Color(ModelPaths.IsPresent(m)),
-                m.Note(), m))
+            .Select(m =>
+            {
+                bool present = ModelPaths.IsPresent(m);
+                return new ModelRow(
+                    m.Label(), Status(present), Color(present), m.Note(), m,
+                    present ? "删除" : "安装");
+            })
             .ToList();
         LocalModelStatusList.ItemsSource = ModelStatusList.ItemsSource;
 
         bool diarizationOk = ModelPaths.DiarizationPresent;
         DiarizationStatus.Text = $"分离模型：{Status(diarizationOk)}";
         DiarizationStatus.Foreground = Color(diarizationOk);
+        DiarizationAction.Content = diarizationOk ? "删除" : "安装";
         DiarizationInstallHint.Visibility = diarizationOk
             ? Visibility.Collapsed : Visibility.Visible;
         DiarizationInstallHint.Text = @".\scripts\setup_diarization.ps1";
@@ -203,9 +209,110 @@ public partial class SettingsWindow : Window
         LocalAsrModel current = _deps.Settings.LocalAsrModel;
         InstallCommandText.Text = ModelPaths.IsPresent(current)
             ? ""
-            : $"未安装：{current.InstallCommand()}";
+            : $"未安装：{current.InstallCommand()}（也可点上方「安装」）";
         InstallCommandText.Visibility = ModelPaths.IsPresent(current)
             ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    // ----- 模型的应用内安装 / 删除 -----
+
+    private bool _modelOpRunning;
+
+    private async void OnModelAction(object sender, RoutedEventArgs e)
+    {
+        if (_modelOpRunning
+            || ((System.Windows.Controls.Button)sender).Tag is not LocalAsrModel model)
+            return;
+        if (ModelPaths.IsPresent(model))
+            await DeleteModelAsync(model);
+        else
+            await InstallModelAsync(() => ModelInstaller.InstallAsync(
+                model, ProgressOf(), CancellationToken.None), model.Label());
+    }
+
+    private async void OnDiarizationAction(object sender, RoutedEventArgs e)
+    {
+        if (_modelOpRunning)
+            return;
+        if (ModelPaths.DiarizationPresent)
+        {
+            if (MessageBox.Show(this, "删除说话人分离模型？会议转写将不可用，之后可重新安装。",
+                    "VoiceType", MessageBoxButton.OKCancel, MessageBoxImage.Question)
+                != MessageBoxResult.OK)
+                return;
+            try
+            {
+                ModelInstaller.DeleteDiarization();
+                RefreshModelStatus();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"删除失败：{ex.Message}", "VoiceType");
+            }
+            return;
+        }
+        await InstallModelAsync(
+            () => ModelInstaller.InstallDiarizationAsync(ProgressOf(), CancellationToken.None),
+            "说话人分离模型");
+    }
+
+    private IProgress<ModelInstallProgress> ProgressOf() => new Progress<ModelInstallProgress>(p =>
+    {
+        InstallProgressText.Text = p.Fraction is double f
+            ? $"{p.Stage} {Math.Clamp((int)(f * 100), 0, 100)}%" : p.Stage;
+        InstallProgressBar.IsIndeterminate = p.Fraction is null;
+        if (p.Fraction is double v)
+            InstallProgressBar.Value = v * 100;
+    });
+
+    private async Task InstallModelAsync(Func<Task> install, string label)
+    {
+        _modelOpRunning = true;
+        LocalModelSection.IsEnabled = false;
+        DiarizationAction.IsEnabled = false;
+        InstallProgressPanel.Visibility = Visibility.Visible;
+        InstallProgressText.Text = "准备下载…";
+        InstallProgressBar.IsIndeterminate = true;
+        try
+        {
+            // 整个安装（下载流、tar 解压的 WaitForExit、文件搬移）都在线程池跑：
+            // async 方法从 UI 线程调用会捕获 UI 上下文，续体会把阻塞段带回 UI 线程
+            await Task.Run(install);
+            _deps.State.RefreshModelsReady();
+            RefreshModelStatus();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"安装{label}失败：{ex.Message}", "VoiceType");
+        }
+        finally
+        {
+            _modelOpRunning = false;
+            LocalModelSection.IsEnabled = true;
+            DiarizationAction.IsEnabled = true;
+            InstallProgressPanel.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private async Task DeleteModelAsync(LocalAsrModel model)
+    {
+        if (MessageBox.Show(this, $"删除 {model.Label()} 的模型文件？之后可重新安装。",
+                "VoiceType", MessageBoxButton.OKCancel, MessageBoxImage.Question)
+            != MessageBoxResult.OK)
+            return;
+        try
+        {
+            // 文件被 ONNX Runtime 占用时删不掉：删的是当前已加载档位就先卸载
+            if (_deps.Asr.LoadedModel == model)
+                await _deps.Asr.UnloadAsync();
+            ModelInstaller.Delete(model);
+            _deps.State.RefreshModelsReady();
+            RefreshModelStatus();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"删除失败：{ex.Message}", "VoiceType");
+        }
     }
 
     private void OnDashKeyChanged(object sender, RoutedEventArgs e)
