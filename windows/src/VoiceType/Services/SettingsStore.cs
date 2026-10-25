@@ -143,6 +143,8 @@ public sealed class SettingsStore
         public string PolishBaseUrl { get; set; } = "http://localhost:11434/v1";
         public string PolishModel { get; set; } = "qwen3.5:4b";
         public PolishStyle PolishStyle { get; set; } = PolishStyle.Clean;
+        /// <summary>第三方应用联动：回调地址 → 是否允许（true 允许 / false 拒绝）；没有记录即还没问过用户</summary>
+        public Dictionary<string, bool> BridgePermissions { get; set; } = [];
     }
 
     private static readonly JsonSerializerOptions JsonOpts = new()
@@ -277,4 +279,27 @@ public sealed class SettingsStore
 
     public PolishConfig PolishConfig => new(
         PolishEnabled, PolishBaseUrl, PolishApiKey, PolishModel, PolishStyle);
+
+    // ----- 第三方应用联动（v6） -----
+
+    /// <summary>回调地址 → 是否允许；没有记录即还没问过用户</summary>
+    public IReadOnlyDictionary<string, bool> BridgePermissions => _data.BridgePermissions;
+
+    public BridgePermission BridgePermissionFor(string callback) =>
+        _data.BridgePermissions.TryGetValue(callback, out bool allowed)
+            ? allowed ? BridgePermission.Allowed : BridgePermission.Denied
+            : BridgePermission.Unknown;
+
+    public void SetBridgePermission(bool allowed, string callback)
+    {
+        _data.BridgePermissions[callback] = allowed;
+        Save();
+    }
+
+    /// <summary>移除后该应用下次请求会重新弹窗询问</summary>
+    public void RemoveBridgePermission(string callback)
+    {
+        _data.BridgePermissions.Remove(callback);
+        Save();
+    }
 }
