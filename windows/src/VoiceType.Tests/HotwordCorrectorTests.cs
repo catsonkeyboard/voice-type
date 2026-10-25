@@ -81,7 +81,9 @@ public class HotwordCorrectorTests
     private static readonly Dictionary<char, string> MixedMap = new(Map)
     {
         ['库'] = "ku", ['伯'] = "bo", ['内'] = "nei", ['提'] = "ti", ['斯'] = "si",
-        ['组'] = "zu", ['建'] = "jian",
+        // 件（热词「Vue 组件」）与 建（识别错写同音「vue组建」）拼音都是 jian；
+        // 到 也给上拼音，避免假实现把未映射字原样返回、让错误窗口的编辑距离虚低
+        ['组'] = "zu", ['件'] = "jian", ['建'] = "jian", ['到'] = "dao",
     };
 
     private static HotwordCorrector MixedCorrector(params string[] hotwords) =>

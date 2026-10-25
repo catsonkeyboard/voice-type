@@ -33,7 +33,7 @@ public sealed class HotwordCorrector
         public record Latin(string Target, string Normalized, bool Fuzzy) : Entry;
         public record Mixed(
             string Target, string LatinNorm, bool LatinFuzzy,
-            char[] Cjk, string CjkPinyin, bool LatinFirst) : Entry;
+            char[] CjkChars, string CjkPinyin, bool LatinFirst) : Entry;
         public record Alias(string Target, Entry AliasEntry) : Entry;
     }
 
@@ -215,11 +215,11 @@ public sealed class HotwordCorrector
                         return null;
                     int? after = SkipSpaces(chars, i + w1);
                     if (after is null ||
-                        MatchCjkWindow(mixed.Cjk, mixed.CjkPinyin, chars, after.Value) is not int w2)
+                        MatchCjkWindow(mixed.CjkChars, mixed.CjkPinyin, chars, after.Value) is not int w2)
                         return null;
                     return after.Value + w2 - i;
                 }
-                if (MatchCjkWindow(mixed.Cjk, mixed.CjkPinyin, chars, i) is not int w3)
+                if (MatchCjkWindow(mixed.CjkChars, mixed.CjkPinyin, chars, i) is not int w3)
                     return null;
                 int? after2 = SkipSpaces(chars, i + w3);
                 if (after2 is null ||
@@ -263,22 +263,19 @@ public sealed class HotwordCorrector
         return width;
     }
 
-    private static int? MatchCjkWindow(char[] target, string targetPinyin, char[] chars, int i)
+    // 实例方法：拼音计算要用注入的 provider（C# 版 PinyinOf 是实例方法）
+    private int? MatchCjkWindow(char[] target, string targetPinyin, char[] chars, int i)
     {
         int n = target.Length;
         if (i + n > chars.Length) return null;
         var window = new char[n];
         Array.Copy(chars, i, window, 0, n);
         if (!Array.TrueForAll(window, IsCjk)) return null;
-        // 注意：C# 版 PinyinOf 是实例方法（依赖注入的 provider），这里由调用方转换
         int maxDistance = Math.Max(1, (int)Math.Ceiling(targetPinyin.Length * 0.2));
-        return CjkWindowPinyinCache(targetPinyin, window, chars, i) is string windowPinyin &&
+        string? windowPinyin = _pinyin.Pinyin(new string(window));
+        return windowPinyin is not null &&
             Levenshtein(targetPinyin, windowPinyin) <= maxDistance ? n : null;
     }
-
-    // 避免 MatchCjkWindow 静态方法里调用实例 PinyinOf 的桥：把拼音计算折回实例路径
-    private string? CjkWindowPinyinCache(string targetPinyin, char[] window, char[] chars, int i)
-        => _pinyin.Pinyin(new string(window));
 
     private static int? SkipSpaces(char[] chars, int from)
     {
