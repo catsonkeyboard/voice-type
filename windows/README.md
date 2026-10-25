@@ -49,6 +49,11 @@ NuGet 包 `org.k2fsa.sherpa.onnx.runtime.win-x64` 自动分发，`dotnet build` 
 - 文本注入无需辅助功能授权；但无法注入以管理员运行的窗口（UIPI），此场景自动降级为复制到剪贴板
 - API Key 存于 Windows 凭据管理器；设置/历史为 `%APPDATA%\VoiceType\` 下 JSON
 - 润色默认推荐 `qwen3.5:4b`（Windows 上 Ollama 走 CPU/CUDA，无 MLX）
+- 第三方应用联动（voicetype://）：协议与 macOS 一致（见根 README）。`voicetype://` 注册在
+  HKCU 注册表（应用启动时自动注册，无需管理员）；应用已在运行时，新 URL 由第二个进程实例经
+  命名管道转发给它。已知差异：回传经 ShellExecute 打开回调地址，Windows 无法禁止目标应用被
+  激活，回传可能把接收方窗口带到前台（macOS 有 `activates=false`）；接收方应用名/图标从
+  注册表解析，解析不到时弹窗只显示回调地址
 
 ## 许可
 

@@ -61,7 +61,7 @@ It works out of the box against `http://localhost:11434/v1`. In Settings → Pol
 
 ## Third-party app integration (v6)
 
-Other apps can ask VoiceType to record and recognize through a URL scheme. The result goes back to the requesting app's own callback URL instead of being pasted at the cursor:
+Other apps can ask VoiceType to record and recognize through a URL scheme. The result goes back to the requesting app's own callback URL instead of being pasted at the cursor (supported on both macOS and Windows with the same protocol):
 
     voicetype://dictate?session=<id>&callback=<url-encoded callback>   # start recording
     voicetype://stop?session=<id>                                       # stop and recognize

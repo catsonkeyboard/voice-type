@@ -54,7 +54,7 @@ Windows 版位于 [`windows/`](windows/)——WPF / .NET 10 / x64，与 macOS �
 
 ## 第三方应用联动（v6）
 
-其他应用可以通过 URL scheme 让 VoiceType 录音识别，结果回传到请求方自己的回调地址，不粘贴到光标处：
+其他应用可以通过 URL scheme 让 VoiceType 录音识别，结果回传到请求方自己的回调地址，不粘贴到光标处（macOS 与 Windows 版均支持，协议一致）：
 
     voicetype://dictate?session=<id>&callback=<URL 编码的回调地址>   # 开始录音
     voicetype://stop?session=<id>                                     # 结束并识别

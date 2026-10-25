@@ -93,6 +93,6 @@ scheme 统一转成小写后作为授权记录的键，避免同一地址因大�
 
 ## 7. 不做
 
-- Windows 版的联动。
+- ~~Windows 版的联动。~~（2026-10-25 已实现：WPF 版与 macOS 协议一致，见 `windows/src/VoiceType/Services/AppBridge.cs`；差异是 scheme 注册走 HKCU 注册表、URL 经命名管道转发给已运行实例、回传经 ShellExecute 无法禁止目标应用被激活）
 - 取消已经进入识别阶段的听写（请求方自行丢弃这次结果）。
 - 按发送方（而非回调地址）授权：URL scheme 拿不到可靠的发送方身份。
