@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Windows.Threading;
 using VoiceType.Core;
 using VoiceType.UI;
@@ -22,6 +23,10 @@ public sealed class DictationController
     private readonly AudioRecorder _recorder = new();
     private DispatcherTimer? _capTimer;
     private DashScopeAsrSession? _cloudSession;
+    /// <summary>边录边跟踪人声，用来自动结束（见 SpeechGate.Watch）</summary>
+    private SpeechGate.Tracker _speechTracker = new();
+    /// <summary>已经因为没有人声或安静太久而要求结束，避免重复触发</summary>
+    private bool _autoEnding;
 
     public DictationController(
         AppState state, AsrService asr, HistoryStore history, PolishService polish,
@@ -84,7 +89,13 @@ public sealed class DictationController
         if (engine == AsrEngine.DashScope)
             SetupCloudSession();
         _recorder.OnLevel = level => _state.MicLevel = level;
-        _recorder.OnChunk = chunk => _cloudSession?.Send(chunk);
+        _speechTracker = new SpeechGate.Tracker();
+        _autoEnding = false;
+        _recorder.OnChunk = chunk =>
+        {
+            _cloudSession?.Send(chunk);
+            WatchSpeech(chunk);
+        };
         try
         {
             _recorder.Start();
@@ -145,14 +156,34 @@ public sealed class DictationController
         _state.PartialText = null;
 
         double duration = samples.Length / 16000.0;
-        if (duration < MinRecordingSeconds)
+        // 先留调试录音：被下面挡掉的也留一份，方便核对人声门槛
+        DebugAudioDump.Write(samples);
+        // 录了 0.5 秒以上却全是绝对的 0：麦克风被系统拦下了，按没有授权处理，不是没说话
+        if (duration >= MinRecordingSeconds && SpeechGate.IsDigitalSilence(samples))
         {
+            Debug.WriteLine("VoiceType: 录音全是静音数据，麦克风可能没有授权");
+            session?.Cancel();
+            _state.SetPhaseError("麦克风没有收到声音");
+            HudController.Shared.Flash(
+                "麦克风没有收到声音，请在系统设置中允许 VoiceType 使用麦克风", _state);
+            return;
+        }
+        SpeechGate.Analysis speech = SpeechGate.Analyze(samples);
+        // 太短，或只录到按键声、底噪：不送去识别，否则模型会幻听出文字（见 SpeechGate）
+        if (duration < MinRecordingSeconds || !speech.HasSpeech)
+        {
+            if (duration >= MinRecordingSeconds)
+            {
+                // 只记数字，不含录音内容
+                Debug.WriteLine(
+                    $"VoiceType: 没有检测到人声（最长连续 {speech.LongestRunSeconds:F2} 秒，" +
+                    $"最大音量 {speech.PeakLevel:F3}），按没说话处理");
+            }
             session?.Cancel();
             _state.Phase = AppState.PhaseKind.Idle;
             HudController.Shared.Hide();
             return;
         }
-        DebugAudioDump.Write(samples);
         _state.Phase = AppState.PhaseKind.Transcribing;
         try
         {
@@ -177,6 +208,9 @@ public sealed class DictationController
                     cloudDegraded = true;
                 text = await _asr.TranscribeAsync(samples);
             }
+            // 去掉模型漏出来的静音标记（/sil 等），只剩它们时按没说话处理；
+            // 模型卡在循环里反复输出的片段只留一份（见 RepetitionGuard）
+            text = RepetitionGuard.Collapse(SpeechGate.StripSilenceTokens(text));
             text = new HotwordCorrector(DevGlossary.MergedWithUser(_settings.Hotwords)).Correct(text);
             if (text.Length == 0)
             {
@@ -192,9 +226,11 @@ public sealed class DictationController
                 string? polished = await _polish.Polish(text);
                 if (polished is not null)
                 {
-                    if (polished != text)
+                    // 润色模型同样可能陷入循环
+                    string cleaned = RepetitionGuard.Collapse(polished);
+                    if (cleaned != text)
                         rawText = text;
-                    text = polished;
+                    text = cleaned;
                 }
                 else
                 {
@@ -224,6 +260,27 @@ public sealed class DictationController
             _state.SetPhaseError(e.Message);
             HudController.Shared.Flash($"识别失败：{e.Message}", _state);
         }
+    }
+
+    /// <summary>
+    /// 边录边看有没有人声：开头一直没人说话，或说完后安静很久，就像再按一次快捷键那样结束。
+    /// 没人说话的录音会在结束时被 SpeechGate 判成「没说话」。
+    /// OnChunk 由录音器派发到 UI 线程回调，这里可以直接结束录音。
+    /// </summary>
+    private void WatchSpeech(float[] chunk)
+    {
+        if (_state.Phase != AppState.PhaseKind.Recording || _autoEnding)
+            return;
+        _speechTracker.Feed(chunk);
+        SpeechGate.WatchResult verdict = SpeechGate.Watch(_speechTracker);
+        if (verdict == SpeechGate.WatchResult.KeepGoing)
+            return;
+        _autoEnding = true;
+        if (verdict == SpeechGate.WatchResult.NoSpeech)
+            Debug.WriteLine($"VoiceType: 开头 {SpeechGate.NoSpeechTimeoutSeconds:F0} 秒没有人声，自动结束录音");
+        else
+            Debug.WriteLine($"VoiceType: 说完后安静了 {SpeechGate.TrailingSilenceSeconds:F0} 秒，自动结束录音");
+        _ = FinishRecordingAsync();
     }
 
     /// <summary>面板文件转写入口</summary>
