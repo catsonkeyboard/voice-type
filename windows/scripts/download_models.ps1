@@ -4,6 +4,7 @@
 #   qwen3          Qwen3-ASR-0.6B（约 950MB）30 语种 + 22 中文方言
 #   fire-red-ctc   FireRedASR2-CTC（约 1.7GB，实验档）中英混合 + 20 余种方言，CTC 解码 CPU 快
 # SenseVoiceSmall 请用 scripts\export_sensevoice.ps1。
+# 公共组件 silero_vad.onnx 无论装哪档都会自动补齐（VAD 分段与文件转写用）。
 param([string]$Target = 'funasr-nano')
 $ErrorActionPreference = 'Stop'
 
@@ -13,6 +14,16 @@ New-Item -ItemType Directory -Force -Path $Dest | Out-Null
 if ($Target -notin @('funasr-nano', 'qwen3', 'fire-red-ctc', 'all')) {
     Write-Error "未知目标: $Target（可选 funasr-nano | qwen3 | fire-red-ctc | all）"
 }
+
+# 公共组件：VAD 模型，装任何档位都确保存在（此前只靠 export_sensevoice.ps1 顺带下载，装其他档会漏）
+$vad = Join-Path $Dest 'silero_vad.onnx'
+if (-not (Test-Path $vad)) {
+    Write-Host '下载 silero_vad.onnx …'
+    $vadTmp = Join-Path $env:TEMP 'silero_vad.onnx'
+    # 这个文件只在 GitHub release 有，ModelScope 仓库没有单文件
+    Invoke-WebRequest -Uri 'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx' -OutFile $vadTmp -UseBasicParsing
+    Move-Item $vadTmp $vad -Force
+} else { Write-Host 'silero_vad.onnx 已安装' }
 
 function Fetch([string]$Name, [string]$OutDir) {
     $ms = "https://modelscope.cn/models/csukuangfj/asr-models/resolve/master/$Name"
@@ -60,5 +71,5 @@ if ($Target -in @('fire-red-ctc', 'all')) {
     } else { Write-Host "fire-red-ctc 已安装" }
 }
 
-Get-ChildItem $Dest | Where-Object { $_.Name -match 'funasr|qwen3|fire-red|model\.int8|tokens' } |
+Get-ChildItem $Dest | Where-Object { $_.Name -match 'funasr|qwen3|fire-red|silero|model\.int8|tokens' } |
     ForEach-Object { Write-Host ("{0,-16} {1,10:N1} MB" -f $_.Name, ($_.Length / 1MB)) }

@@ -30,7 +30,8 @@ NuGet 包 `org.k2fsa.sherpa.onnx.runtime.win-x64` 自动分发，`dotnet build` 
     powershell -ExecutionPolicy Bypass -File windows\scripts\fetch_deps.ps1
 
 模型安装到 `%APPDATA%\VoiceType\models\`（与 macOS 端同一布局，模型文件通用）。VAD 模型
-`silero_vad.onnx` 由 export_sensevoice.ps1 一并尝试下载；仅影响 >20s 长音频分段与文件转写。
+`silero_vad.onnx` 由 download_models.ps1 自动补齐（export_sensevoice.ps1 也会顺带下载）；
+仅影响 >20s 长音频分段与文件转写。
 
 运行：`windows\src\VoiceType\bin\Release\net10.0-windows\win-x64\VoiceType.exe`（托盘常驻，左键托盘打开面板）。
 
